@@ -1,5 +1,7 @@
 #include "../drivers/screen.h"
 
+void __stack_chk_fail() {}
+
 void main() {
 	char string1[] = "abcd";
 	char string2[] = "1234";

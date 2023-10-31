@@ -2,43 +2,47 @@
 # $< = first dependcy
 # $^ = all dependecies
 
-C_SOURCES = $(wildcard kernel/*.c drivers/*.c)
-HEADERS = $(wildcard kernel/*.h drivers/*.h)
+C_SOURCES = $(wildcard *.c */*.c)
+HEADERS = $(wildcard *.h */*.h)
 OBJ = ${C_SOURCES:.c=.o}
 
-CC = /usr/local/cross/bin/i686-elf-gcc
-LD = /usr/local/cross/bin/i686-elf-ld
+CC = gcc 
+LD = /home/thman/opt/cross/x86_64-elf/bin/ld
+SM = nasm
 GDB = gdb
 
-CFLAGS = -g
+CCFLAGS = -g -fno-stack-protector -march=x86-64
+LDFLAGS = -g -m elf_x86_64
+SMFLAGS = 
+
+check:
+	echo ${C_SOURCES}
 
 image.bin: boot_sector.bin kernel.bin
 	cat $^ > $@
 
 kernel.bin: boot/kernel_entry.o ${OBJ}
-	${LD} -o $@ -Ttext 0x1000 $^ --oformat binary
+	${LD} ${LDFLAGS} -o $@ -Ttext 0x1000 $^ --oformat binary
 
 kernel.elf: boot/kernel_entry.o ${OBJ}
-	${LD} -g -o $@ -Ttext 0x1000 $^
+	${LD} ${LDFLAGS} -o $@ -Ttext 0x1000 $^
 
 run: image.bin 
-	qemu-system-x86_64 -fda $<
+	qemu-system-x86_64 -s -drive file=$<,format=raw
 
 debug: image.bin kernel.elf
-	qemu-system-x86_64 -s -fda image.bin &
+	qemu-system-x86_64 -s -drive file=$<,format=raw &
 	${GDB} -ex "target remote localhost:1234" -ex "symbol-file kernel.elf"
 
 %.o: */%.c ${HEADERS}
-	${CC} ${FLAGS} -ffreestanding -c $< -o $@
+	${CC} ${CCFLAGS} -ffreestanding -c $< -o $@
 
 %.o: %.asm
-	nasm $< -f elf -o $@
+	nasm ${SMFLAGS} $< -f elf64 -o $@
 
 %.bin: */%.asm
-	nasm $< -f bin -o $@
+	nasm ${SMFLAGS} $< -f bin -o $@
 
 clean:
-	rm -rf *.bin *.dis *.o *.elf
-	rm kernel/*.bin kernel/*.o boot/*.bin boot/*.o
-	rm drivers/*.bin drivers/*.o
-	rm image.bin
+	rm $(wildcard *.bin */*.bin)
+	rm $(wildcard *.o */*.o)
