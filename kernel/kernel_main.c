@@ -2,14 +2,20 @@
 
 void __stack_chk_fail() {}
 
+int offsetToCols(int offset);
+int offsetToRows(int offset);
+
+int CoordsToOffset(int x, int y);
+
+int putchar_xy(char ch, int x, int y, char attr);
+//sint putchar_offset(char ch, int offset, char attr);
+
 void main() {
-	char string1[] = "abcd";
-	char string2[] = "1234";
-	char string3[] = "zxcv";
-	char string4[] = "asdf";
-	clean_screen();
-	kprint_at(string1, 1, 1);
-	kprint_at(string2, 1, 2);
-	//kprint_at(string3, 0, 20);
-	//kprint(strings[3]);
+	clear_screen();
+
+	char str[] = "1234";
+	int offset = get_offset(0,0);
+	for (int i = 0; str[i] != 0; i++) {
+		offset = print_char(str[i], offset, GREY_ON_BLACK);
+	}
 }

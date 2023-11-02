@@ -2,47 +2,51 @@
 # $< = first dependcy
 # $^ = all dependecies
 
-C_SOURCES = $(wildcard *.c */*.c)
+ASM_SRC_TO_BIN = boot/boot_sector.asm
+ASM_SRC_TO_OBJ = boot/kernel_entry.asm
+C_SRC = $(wildcard *.c */*.c)
 HEADERS = $(wildcard *.h */*.h)
-OBJ = ${C_SOURCES:.c=.o}
+OBJ = ${C_SRC:.c=.o} ${ASM_SRC_TO_OBJ:.asm=.o}
+BIN = ${ASM_SRC_TO_BIN:.asm=.bin} 
 
-CC = gcc 
+CC = gcc
 LD = /home/thman/opt/cross/x86_64-elf/bin/ld
 SM = nasm
 GDB = gdb
 
-CCFLAGS = -g -fno-stack-protector -march=x86-64
+CCFLAGS = -g -fno-stack-protector -march=x86-64 -ffreestanding -c
 LDFLAGS = -g -m elf_x86_64
-SMFLAGS = 
+#SMFLAGS = 
 
 check:
-	echo ${C_SOURCES}
+	echo ${OBJ}
 
-image.bin: boot_sector.bin kernel.bin
+image.bin: ${BIN} kernel.bin
 	cat $^ > $@
 
-kernel.bin: boot/kernel_entry.o ${OBJ}
+kernel.bin: ${OBJ}
 	${LD} ${LDFLAGS} -o $@ -Ttext 0x1000 $^ --oformat binary
 
-kernel.elf: boot/kernel_entry.o ${OBJ}
+kernel.elf: ${OBJ}
 	${LD} ${LDFLAGS} -o $@ -Ttext 0x1000 $^
 
 run: image.bin 
 	qemu-system-x86_64 -s -drive file=$<,format=raw
 
 debug: image.bin kernel.elf
-	qemu-system-x86_64 -s -drive file=$<,format=raw &
+	qemu-system-x86_64 -s -S -drive file=$<,format=raw &
 	${GDB} -ex "target remote localhost:1234" -ex "symbol-file kernel.elf"
 
-%.o: */%.c ${HEADERS}
-	${CC} ${CCFLAGS} -ffreestanding -c $< -o $@
+%.o: %.c ${HEADERS}
+	${CC} ${CCFLAGS} $< -o $@
 
 %.o: %.asm
 	nasm ${SMFLAGS} $< -f elf64 -o $@
 
-%.bin: */%.asm
+%.bin: %.asm
 	nasm ${SMFLAGS} $< -f bin -o $@
 
 clean:
-	rm $(wildcard *.bin */*.bin)
-	rm $(wildcard *.o */*.o)
+	rm -f $(wildcard *.bin */*.bin)
+	rm -f $(wildcard *.o */*.o)
+	rm -f $(wildcard *.elf */*.elf)
