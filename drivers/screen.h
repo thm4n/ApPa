@@ -16,4 +16,7 @@ void kprint_at(const char* msg, int col, int row);
 void kprint(char* message);
 
 int get_offset(int col, int row);
-int print_char(char c, int offset, char attr);
+int get_offset_row(int offset);
+int get_offset_col(int offset);
+
+int print_char(char c, int col, int row, char attr);

@@ -11,7 +11,7 @@ int get_offset_col(int offset);
 
 //public functions:
 
-void clean_screen() {
+void clear_screen() {
 	int screen_size = MAX_COLS * MAX_ROWS;
 	char* screen = VIDEO_ADDRESS;
 
