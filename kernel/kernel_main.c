@@ -2,9 +2,6 @@
 
 void __stack_chk_fail() {}
 
-int offsetToCols(int offset);
-int offsetToRows(int offset);
-
 int CoordsToOffset(int x, int y);
 
 int putchar_xy(char ch, int x, int y, char attr);
@@ -16,6 +13,6 @@ void main() {
 	char str[] = "1234";
 	int offset = get_offset(0,0);
 	for (int i = 0; str[i] != 0; i++) {
-		offset = print_char(str[i], offset, GREY_ON_BLACK);
+		offset = print_char(str[i], get_offset_col(offset), get_offset_row(offset), GREY_ON_BLACK);
 	}
 }
