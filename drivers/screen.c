@@ -43,6 +43,20 @@ void kprint(char* message) {
 	kprint_at(message, -1 ,-1);
 }
 
+void kprint_hex(uint32_t value) {
+	char hex_str[11];  // "0x" + 8 hex digits + null
+	hex_str[0] = '0';
+	hex_str[1] = 'x';
+	hex_str[10] = '\0';
+	
+	const char hex_chars[] = "0123456789ABCDEF";
+	for (int i = 9; i >= 2; i--) {
+		hex_str[i] = hex_chars[value & 0xF];
+		value >>= 4;
+	}
+	kprint(hex_str);
+}
+
 int get_cursor_offset() {
 	port_byte_out(REG_SCREEN_CTRL, 14);
 	int offset = port_byte_in(REG_SCREEN_DATA) << 8; 

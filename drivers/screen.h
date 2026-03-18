@@ -1,4 +1,5 @@
 #include "ports.h"
+#include "../libc/stdint.h"
 
 #define VIDEO_ADDRESS (unsigned char*)0xb8000
 #define MAX_ROWS 25
@@ -14,6 +15,7 @@
 void clear_screen();
 void kprint_at(const char* msg, int col, int row);
 void kprint(char* message);
+void kprint_hex(uint32_t value);
 
 int get_offset(int col, int row);
 int get_offset_row(int offset);
