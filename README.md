@@ -1,3 +1,70 @@
 # ApPa
 current state of project:
 working - problems with screen output - green dot out of nowhere :)
+
+---
+
+## Known Issues & Solutions
+
+### Kernel Size vs Bootloader Sector Count
+
+#### The Bug
+The bootloader uses BIOS INT 13h to load the kernel from disk. It reads a fixed number of 512-byte sectors into memory at `0x1000`. If the kernel grows larger than the allocated sectors, the excess code is never loaded from disk.
+
+**Symptoms:**
+- Triple fault / reboot loop
+- QEMU debug shows `check_exception old: 0xd new 0xd` (GPF → GPF → Double Fault)
+- Crash at addresses well above `0x1000` (unloaded code region)
+
+**Root cause:** Kernel binary exceeded the hardcoded sector count in `boot_sector.asm`.
+
+#### Current Solution (Auto-Patching)
+The makefile automatically:
+1. Calculates required sectors from `kernel.bin` size
+2. Patches the sector count byte in `boot_sector.bin` at build time
+3. Pads `image.bin` to match
+
+```makefile
+SECTOR_PATCH_OFFSET = 0x142  # Location of 'mov dh, X' immediate
+```
+
+The bootloader contains a placeholder:
+```asm
+KERNEL_SECTORS_PATCH:          ; Label for makefile to find offset
+    mov dh, 0                  ; PATCHED BY MAKEFILE
+```
+
+**Limit:** 63 sectors (~32KB). The build will fail if exceeded.
+
+#### Future Solution: Two-Stage Bootloader
+When the kernel exceeds 32KB, implement a two-stage bootloader:
+
+```
+Stage 1 (boot_sector.bin, 512 bytes):
+  - Loaded by BIOS at 0x7C00
+  - Loads Stage 2 from disk
+
+Stage 2 (stage2.bin, unlimited size):
+  - Can use LBA addressing for large disks
+  - Can read multiple chunks to load large kernels
+  - Loads kernel.bin at 0x1000
+  - Switches to protected mode
+  - Jumps to kernel
+
+Image layout:
+  [boot_sector.bin][stage2.bin][kernel.bin]
+```
+
+**Files to add:**
+- `boot/stage2.asm` - Second stage loader
+- Update `makefile` to build and concatenate stage2
+
+**When to implement:** When `kernel.bin` approaches 32KB.
+
+#### Recalculating the Patch Offset
+If `boot_sector.asm` changes significantly, recalculate the offset:
+```bash
+nasm -f bin boot/boot_sector.asm -o /dev/null -l /dev/stdout | grep KERNEL_SECTORS_PATCH
+# Or: hexdump -C bin/boot_sector.bin | grep "b6 00"
+```
+Update `SECTOR_PATCH_OFFSET` in `makefile` accordingly.

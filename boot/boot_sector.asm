@@ -27,7 +27,8 @@ load_kernel:
 	call print_nl
 
 	mov bx, KERNEL_OFFSET
-	mov dh, 4
+KERNEL_SECTORS_PATCH:          ; Label for makefile to find offset
+	mov dh, 0                  ; PATCHED BY MAKEFILE - do not change manually
 	mov dl, [BOOT_DRIVE]
 	call disk_load
 	ret
