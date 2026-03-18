@@ -11,4 +11,7 @@ struct InterruptDescriptor32 {
    uint16_t offset_2;        // offset bits 16..31
 };
 
+// Function declarations
+void idt_init(void);
+
 #endif

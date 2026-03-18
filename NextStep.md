@@ -38,13 +38,13 @@ IRQ1 = keyboard interrupt.
 | 4.2 | `drivers/keyboard.c` | Write `keyboard_handler()` — read port 0x60, translate scancode, print char | ✅ |
 | 4.3 | `drivers/keyboard.c` | Write `keyboard_init()` — register handler for IRQ1 | ✅ |
 
-## Phase 5: Integration
+## Phase 5: Integration ✅ COMPLETED
 
-| Task | File | Description |
-|------|------|-------------|
-| 5.1 | `kernel/kernel_main.c` | Call `idt_init()`, `pic_remap()`, `keyboard_init()` |
-| 5.2 | `kernel/kernel_main.c` | Enable interrupts with `asm volatile("sti")` |
-| 5.3 | `makefile` | Add new `.c` and `.asm` files to build |
+| Task | File | Description | Status |
+|------|------|-------------|--------|
+| 5.1 | `kernel/kernel_main.c` | Call `idt_init()`, `pic_remap()`, `keyboard_init()` | ✅ |
+| 5.2 | `kernel/kernel_main.c` | Enable interrupts with `asm volatile("sti")` | ✅ |
+| 5.3 | `makefile` | Add new `.c` and `.asm` files to build | ✅ |
 
 ---
 

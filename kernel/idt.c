@@ -1,5 +1,6 @@
 #include "idt.h"
 #include "isr.h"
+#include "irq.h"
 
 #define IDT_ENTRIES 256
 #define KERNEL_CODE_SEG 0x08
@@ -82,7 +83,24 @@ void idt_init(void) {
     idt_set_gate(30, (uint32_t)isr30, KERNEL_CODE_SEG, flags);
     idt_set_gate(31, (uint32_t)isr31, KERNEL_CODE_SEG, flags);
 
-    // TODO: Remap PIC and set up IRQ handlers (Phase 2, 3)
+    // Set up IRQ handlers (IRQ 0-15 → INT 32-47)
+    // After PIC remapping, hardware interrupts will use these
+    idt_set_gate(32, (uint32_t)irq0,  KERNEL_CODE_SEG, flags);
+    idt_set_gate(33, (uint32_t)irq1,  KERNEL_CODE_SEG, flags);
+    idt_set_gate(34, (uint32_t)irq2,  KERNEL_CODE_SEG, flags);
+    idt_set_gate(35, (uint32_t)irq3,  KERNEL_CODE_SEG, flags);
+    idt_set_gate(36, (uint32_t)irq4,  KERNEL_CODE_SEG, flags);
+    idt_set_gate(37, (uint32_t)irq5,  KERNEL_CODE_SEG, flags);
+    idt_set_gate(38, (uint32_t)irq6,  KERNEL_CODE_SEG, flags);
+    idt_set_gate(39, (uint32_t)irq7,  KERNEL_CODE_SEG, flags);
+    idt_set_gate(40, (uint32_t)irq8,  KERNEL_CODE_SEG, flags);
+    idt_set_gate(41, (uint32_t)irq9,  KERNEL_CODE_SEG, flags);
+    idt_set_gate(42, (uint32_t)irq10, KERNEL_CODE_SEG, flags);
+    idt_set_gate(43, (uint32_t)irq11, KERNEL_CODE_SEG, flags);
+    idt_set_gate(44, (uint32_t)irq12, KERNEL_CODE_SEG, flags);
+    idt_set_gate(45, (uint32_t)irq13, KERNEL_CODE_SEG, flags);
+    idt_set_gate(46, (uint32_t)irq14, KERNEL_CODE_SEG, flags);
+    idt_set_gate(47, (uint32_t)irq15, KERNEL_CODE_SEG, flags);
 
     // Load the IDT
     idt_load((uint32_t)&idtp);

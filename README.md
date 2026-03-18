@@ -1,6 +1,32 @@
 # ApPa
-current state of project:
-working - problems with screen output - green dot out of nowhere :)
+Interactive x86 OS with keyboard input support!
+
+## How to Build and Run
+
+```bash
+make clean && make run
+```
+
+The kernel will boot in QEMU and display:
+```
+ApPa Kernel v0.1
+Initializing interrupt system...
+  [OK] IDT initialized
+  [OK] PIC remapped
+  [OK] Keyboard initialized
+  [OK] Interrupts enabled
+
+System ready. Type something!
+> 
+```
+
+**Try it:** Click in the QEMU window and start typing! The keyboard input is fully functional.
+- Type letters, numbers, symbols
+- Press Enter for newline
+- Press Backspace to delete
+- Press Tab for tab character
+
+---
 
 ## Current Development Status
 - ✅ **Phase 1: CPU Exception Handlers (ISRs 0-31)** - COMPLETED
@@ -19,10 +45,12 @@ working - problems with screen output - green dot out of nowhere :)
   - Scancode to ASCII translation table (US QWERTY)
   - IRQ1 keyboard interrupt handler
   - Backspace support
-- ⏳ **Phase 5: Integration** - NEXT
-  - Initialize all subsystems in kernel_main
-  - Enable interrupts
-  - Interactive keyboard input
+- ✅ **Phase 5: Integration** - COMPLETED
+  - IDT initialization with exception and IRQ handlers
+  - PIC remapping during kernel startup
+  - Keyboard driver initialization
+  - Interrupts enabled globally
+  - **FULLY FUNCTIONAL KEYBOARD INPUT!**
 
 ---
 
