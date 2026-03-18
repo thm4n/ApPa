@@ -5,7 +5,7 @@ void __stack_chk_fail() {}
 int CoordsToOffset(int x, int y);
 
 int putchar_xy(char ch, int x, int y, char attr);
-//sint putchar_offset(char ch, int offset, char attr);
+// int putchar_offset(char ch, int offset, char attr);
 
 void main() {
 	clear_screen();
