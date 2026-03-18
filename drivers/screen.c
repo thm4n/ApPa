@@ -57,6 +57,21 @@ void kprint_hex(uint32_t value) {
 	kprint(hex_str);
 }
 
+void kprint_backspace() {
+	int offset = get_cursor_offset();
+	int row = get_offset_row(offset);
+	int col = get_offset_col(offset);
+	
+	// Move back one position if not at start of screen
+	if (offset > 0) {
+		offset -= 2;
+		unsigned char *vidmem = (unsigned char*) VIDEO_ADDRESS;
+		vidmem[offset] = ' ';  // Erase character
+		vidmem[offset+1] = WHITE_ON_BLACK;
+		set_cursor_offset(offset);
+	}
+}
+
 int get_cursor_offset() {
 	port_byte_out(REG_SCREEN_CTRL, 14);
 	int offset = port_byte_in(REG_SCREEN_DATA) << 8; 

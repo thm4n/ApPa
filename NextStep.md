@@ -11,32 +11,32 @@ These handle CPU exceptions like divide-by-zero, page faults, etc.
 | 1.4 | `kernel/isr_stubs.asm` | Write 32 ISR stubs for CPU exceptions (push error code, push ISR number, jump to common handler) | ✅ |
 | 1.5 | `kernel/isr.c` | Write `isr_handler()` — common C handler that prints exception info | ✅ |
 
-## Phase 2: PIC Remapping
+## Phase 2: PIC Remapping ✅ COMPLETED
 The 8259 PIC maps IRQ0-7 to interrupts 8-15 by default, conflicting with CPU exceptions.
 
 | Task | File | Description | Status |
 |------|------|-------------|--------|
 | 2.1 | `kernel/pic.h` | Define PIC ports (0x20, 0x21, 0xA0, 0xA1) and ICW constants | ✅ |
-| 2.2 | `kernel/pic.c` | Write `pic_remap()` — remap IRQ0-7 → INT 32-39, IRQ8-15 → INT 40-47 | |
-| 2.3 | `kernel/pic.c` | Write `pic_send_eoi()` — send End-Of-Interrupt to PIC | |
+| 2.2 | `kernel/pic.c` | Write `pic_remap()` — remap IRQ0-7 → INT 32-39, IRQ8-15 → INT 40-47 | ✅ |
+| 2.3 | `kernel/pic.c` | Write `pic_send_eoi()` — send End-Of-Interrupt to PIC | ✅ |
 
-## Phase 3: IRQ Handlers (ISRs 32-47)
+## Phase 3: IRQ Handlers (ISRs 32-47) ✅ COMPLETED
 Hardware interrupts: timer, keyboard, etc.
 
-| Task | File | Description |
-|------|------|-------------|
-| 3.1 | `kernel/isr.asm` | Write 16 IRQ stubs (IRQ0-15 → call common IRQ handler) |
-| 3.2 | `kernel/isr.c` | Write `irq_handler()` — dispatch to registered handlers, send EOI |
-| 3.3 | `kernel/isr.c` | Write `register_interrupt_handler()` — callback registration |
+| Task | File | Description | Status |
+|------|------|-------------|--------|
+| 3.1 | `kernel/irq_stubs.asm` | Write 16 IRQ stubs (IRQ0-15 → call common IRQ handler) | ✅ |
+| 3.2 | `kernel/isr.c` | Write `irq_handler()` — dispatch to registered handlers, send EOI | ✅ |
+| 3.3 | `kernel/isr.c` | Write `register_interrupt_handler()` — callback registration | ✅ |
 
-## Phase 4: Keyboard Driver
+## Phase 4: Keyboard Driver ✅ COMPLETED
 IRQ1 = keyboard interrupt.
 
-| Task | File | Description |
-|------|------|-------------|
-| 4.1 | `drivers/keyboard.h` | Define scancode-to-ASCII table |
-| 4.2 | `drivers/keyboard.c` | Write `keyboard_handler()` — read port 0x60, translate scancode, print char |
-| 4.3 | `drivers/keyboard.c` | Write `keyboard_init()` — register handler for IRQ1 |
+| Task | File | Description | Status |
+|------|------|-------------|--------|
+| 4.1 | `drivers/keyboard.h` | Define scancode-to-ASCII table | ✅ |
+| 4.2 | `drivers/keyboard.c` | Write `keyboard_handler()` — read port 0x60, translate scancode, print char | ✅ |
+| 4.3 | `drivers/keyboard.c` | Write `keyboard_init()` — register handler for IRQ1 | ✅ |
 
 ## Phase 5: Integration
 
@@ -51,15 +51,17 @@ IRQ1 = keyboard interrupt.
 ## File Structure After Completion
 ```
 kernel/
-    idt.c / idt.h       # IDT setup
-    isr.asm             # ISR/IRQ assembly stubs
-    isr.c / isr.h       # C handlers + dispatcher
-    pic.c / pic.h       # PIC remapping
-    kernel_main.c       # Entry point
+    idt.c / idt.h           # IDT setup
+    isr_stubs.asm           # CPU exception stubs (ISR 0-31)
+    isr.c / isr.h           # CPU exception handlers + shared infrastructure
+    irq_stubs.asm           # Hardware interrupt stubs (IRQ 0-15)
+    irq.c / irq.h           # Hardware interrupt handlers
+    pic.c / pic.h           # PIC remapping
+    kernel_main.c           # Entry point
 drivers/
     keyboard.c / keyboard.h
-    ports.c / ports.h   # Already exists
-    screen.c / screen.h # Already exists
+    ports.c / ports.h       # Already exists
+    screen.c / screen.h     # Already exists
 ```
 
 ## Execution Order at Runtime

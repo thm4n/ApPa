@@ -7,10 +7,22 @@ working - problems with screen output - green dot out of nowhere :)
   - IDT structure and initialization
   - 32 exception handlers for CPU faults
   - Common exception handler with error reporting
-- 🔄 **Phase 2: PIC Remapping** - IN PROGRESS
-  - ✅ Step 2.1: PIC port and constant definitions (`kernel/pic.h`)
-  - ⏳ Step 2.2: PIC remap function
-  - ⏳ Step 2.3: EOI (End-Of-Interrupt) handler
+- ✅ **Phase 2: PIC Remapping** - COMPLETED
+  - PIC port and constant definitions (`kernel/pic.h`)
+  - PIC remap function to avoid IRQ/exception conflicts
+  - EOI (End-Of-Interrupt) handler for interrupt acknowledgment
+- ✅ **Phase 3: IRQ Handlers (ISRs 32-47)** - COMPLETED
+  - 16 IRQ assembly stubs (IRQ0-15 → INT 32-47)
+  - IRQ dispatcher with custom handler support
+  - Automatic EOI acknowledgment to PIC
+- ✅ **Phase 4: Keyboard Driver** - COMPLETED
+  - Scancode to ASCII translation table (US QWERTY)
+  - IRQ1 keyboard interrupt handler
+  - Backspace support
+- ⏳ **Phase 5: Integration** - NEXT
+  - Initialize all subsystems in kernel_main
+  - Enable interrupts
+  - Interactive keyboard input
 
 ---
 

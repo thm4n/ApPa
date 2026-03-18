@@ -14,6 +14,9 @@ typedef struct {
 // ISR handler function type
 typedef void (*isr_handler_t)(registers_t*);
 
+// Array of interrupt handlers (shared by ISR and IRQ)
+extern isr_handler_t interrupt_handlers[256];
+
 // C handler called from assembly
 void isr_handler(registers_t* regs);
 

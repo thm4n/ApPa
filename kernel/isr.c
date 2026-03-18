@@ -1,8 +1,8 @@
 #include "isr.h"
 #include "../drivers/screen.h"
 
-// Array of interrupt handlers
-static isr_handler_t interrupt_handlers[256];
+// Array of interrupt handlers (shared by ISR and IRQ)
+isr_handler_t interrupt_handlers[256];
 
 /*
  * CPU Exception Messages (Interrupts 0-31)
