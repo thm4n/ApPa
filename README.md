@@ -2,6 +2,16 @@
 current state of project:
 working - problems with screen output - green dot out of nowhere :)
 
+## Current Development Status
+- ✅ **Phase 1: CPU Exception Handlers (ISRs 0-31)** - COMPLETED
+  - IDT structure and initialization
+  - 32 exception handlers for CPU faults
+  - Common exception handler with error reporting
+- 🔄 **Phase 2: PIC Remapping** - IN PROGRESS
+  - ✅ Step 2.1: PIC port and constant definitions (`kernel/pic.h`)
+  - ⏳ Step 2.2: PIC remap function
+  - ⏳ Step 2.3: EOI (End-Of-Interrupt) handler
+
 ---
 
 ## Known Issues & Solutions
