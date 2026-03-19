@@ -94,8 +94,7 @@ $(BIN_DIR)/image.bin: $(BIN_DIR)/boot_sector.bin $(BIN_DIR)/kernel.bin | $(BIN_D
 	cat $(BIN_DIR)/boot_sector.bin $(BIN_DIR)/kernel.bin > $@; \
 	IMAGE_SIZE=$$((512 + $$SECTORS * 512)); \
 	dd if=/dev/zero of=$@ bs=1 count=0 seek=$$IMAGE_SIZE 2>/dev/null; \
-	echo "[DEBUG] Created $@ successfully ($$IMAGE_SIZE by$(KERNEL_OFFSET) $^ --oformat binary"
-	${LD} ${LDFLAGS} -o $@ -Ttext $(KERNEL_OFFSET)
+	echo "[DEBUG] Created $@ successfully ($$IMAGE_SIZE bytes)"
 $(BIN_DIR)/kernel.bin: boot/kernel_entry.o ${OBJ} ${KERNEL_ASM_OBJ} | $(BIN_DIR)
 	@echo "[DEBUG] Building target: $@"
 	@echo "[DEBUG] Linking objects: $^"

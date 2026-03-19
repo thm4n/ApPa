@@ -14,13 +14,22 @@
 #define KEYBOARD_DATA_PORT    0x60  // Read scan codes
 #define KEYBOARD_STATUS_PORT  0x64  // Status/command port
 
+// Special key scan codes
+#define KEY_LSHIFT   0x2A   // Left shift
+#define KEY_RSHIFT   0x36   // Right shift
+#define KEY_LCTRL    0x1D   // Left control
+#define KEY_RCTRL    0x9D   // Right control (break code)
+#define KEY_LALT     0x38   // Left alt
+#define KEY_RALT     0xB8   // Right alt (break code)
+#define KEY_CAPSLOCK 0x3A   // Caps lock
+
 /*
  * Scancode to ASCII Translation Table
  * 
  * Maps keyboard scan codes (make codes) to ASCII characters.
  * Scan codes are hardware-specific key identifiers.
  * 
- * US QWERTY layout, lowercase, no modifier key support.
+ * US QWERTY layout, lowercase (unshifted).
  * 
  * Index = scan code (0x00-0x7F)
  * Value = ASCII character (0 = unprintable/special key)
@@ -47,6 +56,47 @@ static const char scancode_to_ascii[128] = {
     0,    0,    0,    0,    0,    0,    0,    0,     // 0x70-0x77
     0,    0,    0,    0,    0,    0,    0,    0      // 0x78-0x7F
 };
+
+/*
+ * apply_shift - Convert character to shifted version
+ * @c: Character to shift
+ * 
+ * For letters: converts to uppercase
+ * For symbols: returns shifted symbol
+ * For others: returns unchanged
+ */
+static inline char apply_shift(char c) {
+    // Letters: convert to uppercase (a-z -> A-Z)
+    if (c >= 'a' && c <= 'z') {
+        return c - 32;
+    }
+    
+    // Symbols that change when shifted
+    switch (c) {
+        case '1': return '!';
+        case '2': return '@';
+        case '3': return '#';
+        case '4': return '$';
+        case '5': return '%';
+        case '6': return '^';
+        case '7': return '&';
+        case '8': return '*';
+        case '9': return '(';
+        case '0': return ')';
+        case '-': return '_';
+        case '=': return '+';
+        case '[': return '{';
+        case ']': return '}';
+        case ';': return ':';
+        case '\'': return '"';
+        case '`': return '~';
+        case '\\': return '|';
+        case ',': return '<';
+        case '.': return '>';
+        case '/': return '?';
+        default: return c;  // No shift mapping
+    }
+}
 
 // Function declarations
 void keyboard_init(void);

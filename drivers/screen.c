@@ -1,6 +1,9 @@
 #include "screen.h"
 #include "serial.h"
 
+// Global current color (default: white on black)
+static char current_color = WHITE_ON_BLACK;
+
 //private functions
 
 int get_cursor_offset();
@@ -19,7 +22,7 @@ void clear_screen() {
 
 	for(int i = 0; i < screen_size; i++) {
 		screen[i*2] = ' ';
-		screen[i*2 + 1] = WHITE_ON_BLACK;
+		screen[i*2 + 1] = current_color;
 	}
 	set_cursor_offset(get_offset(0,0));
 }
@@ -35,7 +38,7 @@ void kprint_at(const char* msg, int col, int row) {
 	}
 
 	for (int i = 0; msg[i] != 0; i++) {
-		offset = print_char(msg[i], col, row, WHITE_ON_BLACK);
+		offset = print_char(msg[i], col, row, current_color);
 		// Also output to serial port for -nographic mode
 		serial_putc(msg[i]);
 		row = get_offset_row(offset);
@@ -98,7 +101,7 @@ void kprint_backspace() {
 		offset -= 2;
 		unsigned char *vidmem = (unsigned char*) VIDEO_ADDRESS;
 		vidmem[offset] = ' ';  // Erase character
-		vidmem[offset+1] = WHITE_ON_BLACK;
+		vidmem[offset+1] = current_color;
 		set_cursor_offset(offset);
 	}
 }
@@ -136,13 +139,21 @@ void scroll_screen() {
 	for (int col = 0; col < MAX_COLS; col++) {
 		int offset = get_offset(col, MAX_ROWS - 1);
 		vidmem[offset] = ' ';
-		vidmem[offset + 1] = WHITE_ON_BLACK;
+		vidmem[offset + 1] = current_color;
 	}
+}
+
+void set_text_color(char color) {
+	current_color = color;
+}
+
+char get_text_color() {
+	return current_color;
 }
 
 int print_char(char c, int col, int row, char attr) {
 	unsigned char *vidmem = (unsigned char*) VIDEO_ADDRESS;
-	if (!attr) attr = WHITE_ON_BLACK;
+	if (!attr) attr = current_color;
 	
 	int offset;
 	if (col >= 0 && row >= 0) offset = get_offset(col, row);

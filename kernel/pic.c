@@ -68,9 +68,10 @@ void pic_remap(uint8_t offset1, uint8_t offset2) {
     port_byte_out(PIC2_DATA, ICW4_8086);
     io_wait();
     
-    // Restore saved interrupt masks
-    port_byte_out(PIC1_DATA, mask1);
-    port_byte_out(PIC2_DATA, mask2);
+    // DON'T restore saved interrupt masks - start with all enabled (0x00)
+    // The old BIOS masks may block keyboard interrupts
+    port_byte_out(PIC1_DATA, 0x00);  // Enable all IRQs 0-7
+    port_byte_out(PIC2_DATA, 0x00);  // Enable all IRQs 8-15
 }
 
 /**
@@ -92,4 +93,52 @@ void pic_send_eoi(uint8_t irq) {
     
     // Always send EOI to master (all IRQs go through it)
     port_byte_out(PIC1_COMMAND, PIC_EOI);
+}
+
+/**
+ * irq_clear_mask - Unmask (enable) an IRQ line
+ * @irq: IRQ number (0-15)
+ * 
+ * Clears the mask bit for the specified IRQ, allowing interrupts
+ * from that hardware device to reach the CPU.
+ */
+void irq_clear_mask(uint8_t irq) {
+    uint16_t port;
+    uint8_t value;
+
+    if (irq < 8) {
+        port = PIC1_DATA;
+    } else {
+        port = PIC2_DATA;
+        irq -= 8;
+    }
+    
+    value = port_byte_in(port) & ~(1 << irq);
+    port_byte_out(port, value);
+    
+    // DEBUG: Verify unmask
+    port_byte_out(0xE9, 'U');  // QEMU debug port
+    port_byte_out(0xE9, '0' + irq);  // IRQ number
+}
+
+/**
+ * irq_set_mask - Mask (disable) an IRQ line
+ * @irq: IRQ number (0-15)
+ * 
+ * Sets the mask bit for the specified IRQ, blocking interrupts
+ * from that hardware device.
+ */
+void irq_set_mask(uint8_t irq) {
+    uint16_t port;
+    uint8_t value;
+
+    if (irq < 8) {
+        port = PIC1_DATA;
+    } else {
+        port = PIC2_DATA;
+        irq -= 8;
+    }
+    
+    value = port_byte_in(port) | (1 << irq);
+    port_byte_out(port, value);
 }
