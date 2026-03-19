@@ -2,6 +2,7 @@
 #include "../drivers/screen.h"
 #include "../libc/string.h"
 #include "kmalloc.h"
+#include "timer.h"
 
 /*
  * ApPa Simple Command Shell
@@ -19,6 +20,7 @@ static void cmd_clear(void);
 static void cmd_echo(const char* args);
 static void cmd_mem(void);
 static void cmd_color(const char* args);
+static void cmd_uptime(void);
 
 /**
  * shell_init - Initialize the shell
@@ -101,6 +103,8 @@ void shell_execute(const char* cmd) {
 		cmd_mem();
 	} else if (strncmp(cmd, "color", cmd_len) == 0 && cmd_len == 5) {
 		cmd_color(args);
+	} else if (strncmp(cmd, "uptime", cmd_len) == 0 && cmd_len == 6) {
+		cmd_uptime();
 	} else {
 		kprint("Unknown command: ");
 		kprint((char*)cmd);
@@ -117,6 +121,7 @@ static void cmd_help(void) {
 	kprint("  clear        - Clear the screen\n");
 	kprint("  echo <text>  - Print text to screen\n");
 	kprint("  mem          - Display memory allocation statistics\n");
+	kprint("  uptime       - Show system uptime\n");
 	kprint("  color <name> - Change text color\n");
 	kprint("               Colors: white, red, green, blue, yellow,\n");
 	kprint("                       cyan, magenta, grey, black\n");
@@ -145,6 +150,17 @@ static void cmd_echo(const char* args) {
  */
 static void cmd_mem(void) {
 	kmalloc_status();
+}
+
+/**
+ * cmd_uptime - Display system uptime
+ */
+static void cmd_uptime(void) {
+	char uptime_str[32];
+	get_uptime_string(uptime_str);
+	kprint("System uptime: ");
+	kprint(uptime_str);
+	kprint("\n");
 }
 
 /**

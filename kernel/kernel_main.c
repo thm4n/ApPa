@@ -3,6 +3,7 @@
 #include "idt.h"
 #include "pic.h"
 #include "pit.h"
+#include "timer.h"
 #include "../drivers/keyboard.h"
 #include "kmalloc.h"
 #include "klog.h"
@@ -32,38 +33,39 @@ void main() {
 	pic_remap(32, 40);
 	kprint("  [OK] PIC remapped\n");
 	
-	// Initialize PIT (Programmable Interval Timer) for timer interrupts
-	// This will generate IRQ0 at 100Hz (10ms intervals)
+	// Phase 3: Initialize PIT (Programmable Interval Timer) hardware
+	// Configure PIT to generate IRQ0 at 100Hz (10ms intervals)
 	pit_init(100);
 	kprint("  [OK] PIT initialized (100Hz)\n");
 	
-	// Initialize PIT (timer) to generate IRQ0 at 100Hz (10ms intervals)
-	pit_init(100);
-	kprint("  [OK] PIT initialized (100Hz)\n");
+	// Phase 3.5: Initialize timer subsystem
+	// Registers IRQ0 handler and sets up tick counter
+	timer_init();
+	kprint("  [OK] Timer initialized\n");
 
-	// Phase 3: Initialize kernel heap
+	// Phase 4: Initialize kernel heap
 	// Sets up the initial free block for dynamic memory allocation
 	kmalloc_init();
 	kprint("  [OK] Kernel heap initialized\n");
 
-	// Phase 3.5: Initialize kernel logging system
+	// Phase 4.5: Initialize kernel logging system
 	// Sets up circular buffer for persistent kernel logs
 	//klog_init();  // DISABLED FOR DEBUGGING
 	kprint("  [OK] Kernel logging initialized (DISABLED FOR DEBUG)\n");
 	//klog_info("ApPa Kernel v0.1 booting...");
 	//klog_info("Memory, IDT, and PIC configured");
 
-	// Phase 4: Initialize keyboard driver
+	// Phase 5: Initialize keyboard driver
 	// Registers a handler for IRQ1 (keyboard interrupt)
 	keyboard_init();
 	kprint("  [OK] Keyboard initialized\n");
 
-	// Phase 5: Initialize command shell
+	// Phase 6: Initialize command shell
 	// Sets up command buffer and prepares for interactive input
 	shell_init();
 	kprint("  [OK] Shell initialized\n");
 
-	// Phase 6: Enable interrupts globally
+	// Phase 7: Enable interrupts globally
 	// The STI (Set Interrupt Flag) instruction allows the CPU to
 	// respond to hardware interrupts
 	__asm__ volatile("sti");
