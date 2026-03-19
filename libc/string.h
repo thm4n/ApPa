@@ -10,6 +10,10 @@ int strcmp(const char* s1, const char* s2);
 int strncmp(const char* s1, const char* s2, uint32_t n);
 char* strcpy(char* dest, const char* src);
 char* strncpy(char* dest, const char* src, uint32_t n);
+char* strcat(char* dest, const char* src);
+
+// Conversion functions
+void uitoa(uint32_t value, char* str, int base);
 
 // Memory functions
 void* memset(void* ptr, int value, uint32_t num);

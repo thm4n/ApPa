@@ -41,6 +41,47 @@ char* strncpy(char* dest, const char* src, uint32_t n) {
     return dest;
 }
 
+char* strcat(char* dest, const char* src) {
+    char* original_dest = dest;
+    // Find end of dest string
+    while (*dest)
+        dest++;
+    // Copy src to end of dest
+    while ((*dest++ = *src++));
+    return original_dest;
+}
+
+void uitoa(uint32_t value, char* str, int base) {
+    char* ptr = str;
+    char* ptr1 = str;
+    char tmp_char;
+    uint32_t tmp_value;
+
+    // Handle 0 explicitly
+    if (value == 0) {
+        *ptr++ = '0';
+        *ptr = '\0';
+        return;
+    }
+
+    // Process individual digits
+    do {
+        tmp_value = value;
+        value /= base;
+        *ptr++ = "0123456789abcdef"[tmp_value - value * base];
+    } while (value);
+
+    // Null terminate string
+    *ptr-- = '\0';
+
+    // Reverse the string
+    while (ptr1 < ptr) {
+        tmp_char = *ptr;
+        *ptr-- = *ptr1;
+        *ptr1++ = tmp_char;
+    }
+}
+
 void* memset(void* ptr, int value, uint32_t num) {
     unsigned char* p = (unsigned char*)ptr;
     while (num--)
