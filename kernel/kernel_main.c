@@ -3,6 +3,7 @@
 #include "pic.h"
 #include "../drivers/keyboard.h"
 #include "kmalloc.h"
+#include "../tests/tests.h"
 
 void __stack_chk_fail() {}
 
@@ -40,7 +41,10 @@ void main() {
 	__asm__ volatile("sti");
 	kprint("  [OK] Interrupts enabled\n\n");
 
-	kprint("System ready. Type something!\n");
+	// Run unit tests
+	run_all_tests();
+
+	kprint("\nSystem ready. Type something!\n");
 	kprint("> ");
 
 	// Infinite loop - CPU halts until interrupt occurs

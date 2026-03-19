@@ -1,0 +1,66 @@
+/**
+ * Test Template
+ * 
+ * Copy this file to create a new test:
+ *   cp test_template.c.example test_yourfeature.c
+ *   cp test_template.h.example test_yourfeature.h
+ * 
+ * Then:
+ * 1. Rename functions from test_template to test_yourfeature
+ * 2. Update the header guards in .h file
+ * 3. Implement your test logic
+ * 4. Register in tests/tests.h and tests/tests.c
+ */
+
+#include "../drivers/screen.h"
+#include "test_template.h"
+
+// Helper function (optional) - keep test-specific helpers private
+static void helper_function() {
+    // Helper logic here
+}
+
+/**
+ * Main test function
+ * 
+ * Guidelines:
+ * - Test one feature/component
+ * - Print clear pass/fail messages
+ * - Test normal cases AND edge cases
+ * - Clean up any allocated resources
+ */
+void test_template() {
+    kprint("\n=== Testing [Feature Name] ===\n");
+    
+    // Test 1: Normal case
+    kprint("Test 1: Normal functionality\n");
+    int result = 1;  // Your test code here
+    
+    if (result) {
+        kprint("  [PASS] Normal case works\n");
+    } else {
+        kprint("  [FAIL] Normal case failed\n");
+    }
+    
+    // Test 2: Edge case
+    kprint("Test 2: Edge case (NULL, zero, max, etc.)\n");
+    int edge_result = 1;  // Your edge case test
+    
+    if (edge_result) {
+        kprint("  [PASS] Edge case handled correctly\n");
+    } else {
+        kprint("  [FAIL] Edge case failed\n");
+    }
+    
+    // Test 3: Error handling
+    kprint("Test 3: Error conditions\n");
+    int error_result = 1;  // Test error handling
+    
+    if (error_result) {
+        kprint("  [PASS] Errors handled gracefully\n");
+    } else {
+        kprint("  [FAIL] Error handling broken\n");
+    }
+    
+    kprint("Test completed.\n");
+}

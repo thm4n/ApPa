@@ -1,0 +1,7 @@
+#ifndef TEST_TEMPLATE_H
+#define TEST_TEMPLATE_H
+
+// Function prototype for your test
+void test_template();
+
+#endif
