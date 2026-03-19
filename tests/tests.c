@@ -10,7 +10,9 @@ void run_all_tests() {
     // Run all tests with checkpoints
     kprint("\n>>> Starting test_va_system...\n");
     test_va_system();
-    kprint(">>> CHECKPOINT 1: test_va_system COMPLETE\n");
+    test_printf();
+    test_scrolling();
+    test_klog();
     
     kprint("\n>>> Starting test_printf...\n");
     test_printf();

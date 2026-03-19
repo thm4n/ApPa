@@ -1,8 +1,16 @@
 [org 0x7c00]
-KERNEL_OFFSET equ 0x1000
+
+; Memory configuration (can be overridden by makefile with -D flags)
+%ifndef KERNEL_OFFSET
+	KERNEL_OFFSET equ 0x1000
+%endif
+
+%ifndef REAL_MODE_STACK
+	REAL_MODE_STACK equ 0x9000
+%endif
 
 	mov [BOOT_DRIVE], dl
-	mov bp, 0x9000
+	mov bp, REAL_MODE_STACK
 	mov sp, bp
 
 	mov bx, MSG_REAL_MODE

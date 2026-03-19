@@ -22,9 +22,36 @@ LD = ${CROSS_COMPILER_BINS}ld
 SM = nasm
 GDB = ${CROSS_COMPILER_BINS}gdb
 
+# ========== Memory Layout Configuration ==========
+# These constants define the memory layout for the bootloader and kernel.
+# They are passed to NASM during assembly via -D flags.
+#
+# Memory Map:
+#   0x00000000 - 0x000007FF : Interrupt Vector Table (IVT)
+#   0x00000800 - 0x00000FFF : BIOS Data Area
+#   0x00001000 - 0x0000XXXX : Kernel Code (loaded here)
+#   0x0000XXXX - 0x0009FBFF : Kernel Stack (grows downward from STACK_BASE)
+#   0x0009FC00 - 0x0009FFFF : Stack Base (ESP starts here)
+#   0x000A0000 - 0x000BFFFF : VGA Video Memory
+#   0x000C0000 - 0x000FFFFF : BIOS ROM
+#
+# KERNEL_OFFSET: Where the kernel code is loaded (must match linker -Ttext)
+KERNEL_OFFSET = 0x1000
+
+# STACK_BASE: Top of stack in protected mode (ESP/EBP initialized here)
+# Stack grows DOWN from this address toward KERNEL_OFFSET
+# Current: 0x9FC00 (639KB) provides ~607KB stack space
+# Maximum: 0x9FFF0 (just below VGA at 0xA0000)
+STACK_BASE = 0x9FC00
+
+# REAL_MODE_STACK: Stack location in 16-bit real mode (bootloader phase)
+# Lower value since we're still in 16-bit mode with limited addressing
+REAL_MODE_STACK = 0x9000
+# ==================================================
+
 CCFLAGS = -g -fno-stack-protector -march=i686
 LDFLAGS = -g
-SMFLAGS = 
+SMFLAGS = -D KERNEL_OFFSET=$(KERNEL_OFFSET) -D STACK_BASE=$(STACK_BASE) -D REAL_MODE_STACK=$(REAL_MODE_STACK)
 
 # Debug: Print variables at parse time
 $(info ========== MAKEFILE DEBUG INFO ==========)
@@ -67,8 +94,8 @@ $(BIN_DIR)/image.bin: $(BIN_DIR)/boot_sector.bin $(BIN_DIR)/kernel.bin | $(BIN_D
 	cat $(BIN_DIR)/boot_sector.bin $(BIN_DIR)/kernel.bin > $@; \
 	IMAGE_SIZE=$$((512 + $$SECTORS * 512)); \
 	dd if=/dev/zero of=$@ bs=1 count=0 seek=$$IMAGE_SIZE 2>/dev/null; \
-	echo "[DEBUG] Created $@ successfully ($$IMAGE_SIZE bytes)"
-
+	echo "[DEBUG] Created $@ successfully ($$IMAGE_SIZE by$(KERNEL_OFFSET) $^ --oformat binary"
+	${LD} ${LDFLAGS} -o $@ -Ttext $(KERNEL_OFFSET)
 $(BIN_DIR)/kernel.bin: boot/kernel_entry.o ${OBJ} ${KERNEL_ASM_OBJ} | $(BIN_DIR)
 	@echo "[DEBUG] Building target: $@"
 	@echo "[DEBUG] Linking objects: $^"
@@ -86,6 +113,21 @@ $(BIN_DIR)/kernel.elf: boot/kernel_entry.o ${OBJ} ${KERNEL_ASM_OBJ} | $(BIN_DIR)
 run: $(BIN_DIR)/image.bin 
 	@echo "[DEBUG] Running QEMU with image: $<"
 	qemu-system-i386 -s -drive file=$<,format=raw
+
+run-curses: $(BIN_DIR)/image.bin
+	@echo "[DEBUG] Running QEMU in curses mode (CLI): $<"
+	qemu-system-i386 -s -drive file=$<,format=raw -display curses
+
+run-nographic: $(BIN_DIR)/image.bin
+	@echo "[DEBUG] Running QEMU in nographic mode (text only): $<"
+	@echo "[INFO] Serial output on stdio, Ctrl+A then C for QEMU monitor, Ctrl+A then X to exit"
+	qemu-system-i386 -s -drive file=$<,format=raw -serial mon:stdio -nographic
+
+run-debug-log: $(BIN_DIR)/image.bin
+	@echo "[DEBUG] Running QEMU with serial output logged to debug.log"
+	@echo "[INFO] All kernel output will be saved to debug.log"
+	@rm -f debug.log
+	qemu-system-i386 -s -drive file=$<,format=raw -serial file:debug.log -nographic -monitor stdio
 
 debug: $(BIN_DIR)/image.bin $(BIN_DIR)/kernel.elf
 	@echo "[DEBUG] Starting debug session"

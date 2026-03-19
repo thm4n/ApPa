@@ -9,6 +9,7 @@ int print_char(char c, int col, int row, char attr);
 int get_offset(int col, int row);
 int get_offset_row(int offset);
 int get_offset_col(int offset);
+void scroll_screen();
 
 //public functions:
 
@@ -118,28 +119,51 @@ void set_cursor_offset(int offset) {
 	port_byte_out(REG_SCREEN_DATA, (unsigned char)(offset & 0xff));
 }
 
+void scroll_screen() {
+	unsigned char* vidmem = (unsigned char*)VIDEO_ADDRESS;
+	
+	// Move all lines up by one
+	for (int row = 1; row < MAX_ROWS; row++) {
+		for (int col = 0; col < MAX_COLS; col++) {
+			int src_offset = get_offset(col, row);
+			int dst_offset = get_offset(col, row - 1);
+			vidmem[dst_offset] = vidmem[src_offset];
+			vidmem[dst_offset + 1] = vidmem[src_offset + 1];
+		}
+	}
+	
+	// Clear the last line
+	for (int col = 0; col < MAX_COLS; col++) {
+		int offset = get_offset(col, MAX_ROWS - 1);
+		vidmem[offset] = ' ';
+		vidmem[offset + 1] = WHITE_ON_BLACK;
+	}
+}
+
 int print_char(char c, int col, int row, char attr) {
 	unsigned char *vidmem = (unsigned char*) VIDEO_ADDRESS;
 	if (!attr) attr = WHITE_ON_BLACK;
-
-	if (col >= MAX_COLS || row >= MAX_ROWS) {
-		vidmem[2*(MAX_COLS)*(MAX_ROWS)-2] = 'E';
-		vidmem[2*(MAX_COLS)*(MAX_ROWS)-1] = RED_ON_WHITE;
-		return get_offset(col, row);
-	}
 	
 	int offset;
 	if (col >= 0 && row >= 0) offset = get_offset(col, row);
 	else offset = get_cursor_offset();
 
+	// Handle newline
 	if (c == '\n') {
 		row = get_offset_row(offset);
-		offset = get_offset(0, row+1);
+		offset = get_offset(0, row + 1);
 	} else {
 		vidmem[offset] = c;
 		vidmem[offset+1] = attr;
 		offset += 2;
 	}
+	
+	// Check if we need to scroll
+	if (offset >= MAX_ROWS * MAX_COLS * 2) {
+		scroll_screen();
+		offset = get_offset(0, MAX_ROWS - 1);
+	}
+	
 	set_cursor_offset(offset);
 	return offset;
 }

@@ -1,0 +1,94 @@
+ApPa Kernel v0.1
+Initializing interrupt system...
+  [OK] IDT initialized
+  [OK] PIC remapped
+  [OK] Kernel heap initialized
+  [OK] Kernel logging initialized (DISABLED FOR DEBUG)
+  [OK] Keyboard initialized
+  [OK] Interrupts enabled
+
+
+=====================================
+       RUNNING UNIT TESTS
+=====================================
+
+>>> Starting test_va_system...
+
+=== Testing va_list system ===
+First: Hello
+Second (int): 42
+Third (string): World
+>>> CHECKPOINT 1: test_va_system COMPLETE
+
+>>> Starting test_printf...
+
+=== Testing kprintf ===
+About to test signed integers...
+Test 1: Signed integers (%d)
+Testing positive...
+  Positive: 42
+Done with positive
+  Negative: -42
+  Zero: 0
+  Large: 2147483647
+  Large negative: -2147483648
+  [PASS] Signed integers
+Test 2: Unsigned integers (%u)
+  Small: 42
+  Zero: 0
+  Max: 4294967295
+  [PASS] Unsigned integers
+Test 3: Hexadecimal lowercase (%x)
+  0xDEADBEEF: deadbeef
+  0x0: 0
+  0xFF: ff
+  0x12345678: 12345678
+  [PASS] Hex lowercase
+Test 4: Hexadecimal uppercase (%X)
+  0xDEADBEEF: DEADBEEF
+  0xCAFEBABE: CAFEBABE
+  [PASS] Hex uppercase
+Test 5: Characters (%c)
+  A: A
+  Z: Z
+  0: 0
+  Space: ' '
+  [PASS] Characters
+Test 6: Strings (%s)
+  Hello: Hello
+  World: World!
+  Empty: ''
+  NULL: (null)
+  [PASS] Strings
+Test 7: Pointers (%p)
+  Address of x: 0x9fbac
+  NULL pointer: 0x0
+  High address: 0xdeadbeef
+  [PASS] Pointers
+Test 8: Literal percent (%%)
+  100% complete
+  50% done, 50% to go
+  [PASS] Percent sign
+Test 9: Mixed format specifiers
+  Int 42, Hex 0xff, Str 'test', Char 'X'
+  Name: Alice, Age: 25, ID: 0xABCD
+  [PASS] Mixed formats
+Test 10: Edge cases
+  Just text, no specifiers
+  Multiple % % percent signs
+  Unknown specifier: %z should show '%z'
+  [PASS] Edge cases
+All kprintf tests completed!
+>>> CHECKPOINT 2: test_printf COMPLETE
+
+>>> CHECKPOINT 3: test_scrolling SKIPPED (stack overflow prevention)
+
+>>> CHECKPOINT 4: test_klog SKIPPED (debugging)
+
+=====================================
+       ALL TESTS COMPLETED
+=====================================
+
+
+System ready. Type something!
+> e
