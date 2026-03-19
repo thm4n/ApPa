@@ -15,28 +15,6 @@
 // Track modifier key states
 static uint8_t shift_pressed = 0;
 
-// Timer tick counter for IRQ0
-static uint32_t timer_ticks = 0;
-
-/**
- * timer_handler - IRQ0 interrupt handler
- * @regs: CPU register state at time of interrupt
- * 
- * Called automatically by the PIT (Programmable Interval Timer).
- * Updates a counter on screen to verify interrupts are working.
- */
-static void timer_handler(registers_t *regs) {
-	// Suppress unused parameter warning
-	(void)regs;
-	
-	timer_ticks++;
-	
-	// Update counter on screen every tick
-	unsigned char *video = (unsigned char*)0xb8000;
-	video[158] = '0' + (timer_ticks % 10);
-	video[159] = 0x0C;  // Bright red on black
-}
-
 /**
  * keyboard_handler - IRQ1 interrupt handler
  * @regs: CPU register state at time of interrupt
@@ -110,9 +88,6 @@ static void keyboard_handler(registers_t* regs) {
  *   - Interrupts are enabled with sti
  */
 void keyboard_init(void) {
-	// Register timer handler for IRQ0 (interrupt 32 after PIC remap)
-	register_interrupt_handler(32, timer_handler);
-	
 	// Register keyboard handler for IRQ1 (interrupt 33 after PIC remap)
 	register_interrupt_handler(33, keyboard_handler);
     
