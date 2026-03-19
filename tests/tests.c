@@ -9,6 +9,7 @@ void run_all_tests() {
     
     // Run all tests
     test_va_system();
+    test_printf();
     
     kprint("=====================================\n");
     kprint("       ALL TESTS COMPLETED\n");

@@ -3,6 +3,7 @@
 
 // Include all test headers
 #include "test_varargs.h"
+#include "test_printf.h"
 
 // Master function to run all tests
 void run_all_tests();
