@@ -54,6 +54,85 @@ System ready. Type something!
 
 ---
 
+## Next Steps
+
+### Phase 6: Dynamic Memory Allocator (Heap) - **NEXT**
+**Priority:** High | **Estimated:** 1-2 days  
+**Why first:** Foundation for all dynamic data structures. Required for shell, file systems, and future features.
+
+**Implementation:**
+- `kernel/kmalloc.c` / `kmalloc.h` - Heap allocator implementation
+- Start with simple first-fit or bitmap allocator
+- Functions: `kmalloc()`, `kfree()`, `kmalloc_status()` (for debugging)
+- Define heap region (e.g., 1MB-2MB in physical memory)
+- Track allocated/free blocks with metadata headers
+
+### Phase 7: Simple Command Shell
+**Priority:** High | **Estimated:** 1 day  
+**Why:** Makes keyboard input actually useful! Good practice for string handling.
+
+**Features:**
+- Command buffer and parsing (using kmalloc for buffers)
+- Built-in commands:
+  - `help` - List available commands
+  - `clear` - Clear screen
+  - `echo <text>` - Print text
+  - `mem` - Show memory allocation statistics
+  - `uptime` - Show system uptime (after timer implementation)
+- Command history (optional enhancement)
+
+### Phase 8: Timer (PIT - IRQ0)
+**Priority:** Medium | **Estimated:** 1 day  
+**Why:** Track system uptime, foundation for multitasking scheduler.
+
+**Implementation:**
+- `drivers/timer.c` / `timer.h` - PIT driver
+- Configure PIT (Programmable Interval Timer) on IRQ0
+- Track ticks since boot
+- Convert ticks to seconds/minutes for uptime display
+
+### Phase 9: Physical Memory Manager
+**Priority:** High | **Estimated:** 2-3 days  
+**Why:** Proper RAM detection and tracking. Required before paging.
+
+**Implementation:**
+- Detect available RAM (multiboot info or fixed size detection)
+- Page frame allocator (4KB pages)
+- Bitmap or stack-based free page tracking
+- Functions: `alloc_page()`, `free_page()`
+- Integrate with existing heap allocator
+
+### Phase 10: Paging / Virtual Memory (MMU)
+**Priority:** High | **Estimated:** 3-5 days  
+**Why:** Memory protection, process isolation, enables userspace programs.
+
+**Implementation:**
+- `kernel/paging.c` / `paging.h` - Page table management
+- Identity mapping for kernel (virtual = physical)
+- Enable CR0.PG bit to activate MMU
+- Page fault handler (ISR 14)
+- Separate address spaces for future processes
+
+### Phase 11: File System & Disk I/O
+**Priority:** Medium | **Estimated:** 5-7 days  
+**Why:** Persistent storage, load programs from disk.
+
+**Prerequisites:** All previous phases completed  
+**Implementation:**
+- `drivers/ata.c` / `ata.h` - ATA/IDE disk driver (PIO mode)
+- Simple file system (RAM disk first, then FAT12 or custom FS)
+- VFS layer: `open()`, `read()`, `write()`, `close()`
+- Directory listing in shell (`ls` command)
+
+### Future Enhancements
+- **Multitasking:** Task scheduler, context switching, TSS
+- **Userspace:** Ring 3 processes, syscalls (INT 0x80)
+- **ELF Loader:** Load and execute programs from disk
+- **Networking:** NE2000 driver, basic TCP/IP stack
+- **Graphics:** VESA VBE framebuffer mode
+
+---
+
 ## Known Issues & Solutions
 
 ### Kernel Size vs Bootloader Sector Count
