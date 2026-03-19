@@ -2,6 +2,7 @@
 #include "idt.h"
 #include "pic.h"
 #include "../drivers/keyboard.h"
+#include "kmalloc.h"
 
 void __stack_chk_fail() {}
 
@@ -22,6 +23,11 @@ void main() {
 	// Remap IRQ 0-7 to interrupts 32-39, IRQ 8-15 to interrupts 40-47
 	pic_remap(32, 40);
 	kprint("  [OK] PIC remapped\n");
+
+	// Phase 3: Initialize kernel heap
+	// Sets up the initial free block for dynamic memory allocation
+	kmalloc_init();
+	kprint("  [OK] Kernel heap initialized\n");
 
 	// Phase 4: Initialize keyboard driver
 	// Registers a handler for IRQ1 (keyboard interrupt)
