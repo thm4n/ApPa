@@ -57,6 +57,33 @@ void kprint_hex(uint32_t value) {
 	kprint(hex_str);
 }
 
+void kprint_uint(uint32_t value) {
+	char num_str[11];  // Max 10 digits for 32-bit + null
+	int i = 0;
+	
+	// Handle zero case
+	if (value == 0) {
+		num_str[i++] = '0';
+	} else {
+		// Convert number to string (reversed)
+		uint32_t temp = value;
+		while (temp > 0) {
+			num_str[i++] = '0' + (temp % 10);
+			temp /= 10;
+		}
+		
+		// Reverse the string
+		for (int j = 0; j < i / 2; j++) {
+			char tmp = num_str[j];
+			num_str[j] = num_str[i - 1 - j];
+			num_str[i - 1 - j] = tmp;
+		}
+	}
+	
+	num_str[i] = '\0';
+	kprint(num_str);
+}
+
 void kprint_backspace() {
 	int offset = get_cursor_offset();
 	int row = get_offset_row(offset);

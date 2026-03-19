@@ -16,6 +16,7 @@ void clear_screen();
 void kprint_at(const char* msg, int col, int row);
 void kprint(char* message);
 void kprint_hex(uint32_t value);
+void kprint_uint(uint32_t value);
 void kprint_backspace();
 
 int get_offset(int col, int row);
