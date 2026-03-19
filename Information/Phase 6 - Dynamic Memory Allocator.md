@@ -43,6 +43,7 @@ Each allocated block has a header:
 ### Allocation Strategies
 
 **Best-Fit (Recommended for Phase 6):**
+```c
 void* kmalloc(uint32_t size) {
     // 1. Align size to 4-byte boundary
     if (size == 0) return NULL;
@@ -97,6 +98,7 @@ void* kmalloc(uint32_t size) {
     // 6. Return pointer to payload (skip header)
     return (void*)((uint32_t)best_fit + sizeof(block_header_t));
 }
+```
 
 - Scan entire free list
 - Return smallest block >= requested size
@@ -117,14 +119,14 @@ void* kmalloc(uint32_t size) {
 
 ## Implementation Plan
 
-### Phase 6.1: Basic Infrastructure ⬜ NOT STARTED
+### Phase 6.1: Basic Infrastructure ✅ COMPLETED
 
 | Task | File | Description | Status |
 |------|------|-------------|--------|
-| 6.1.1 | `kernel/kmalloc.h` | Define constants: `HEAP_START`, `HEAP_END`, `HEAP_SIZE` | ⬜ |
-| 6.1.2 | `kernel/kmalloc.h` | Define `block_header` struct (size, is_free) | ⬜ |
-| 6.1.3 | `kernel/kmalloc.h` | Declare function prototypes: `kmalloc()`, `kfree()`, `kmalloc_init()`, `kmalloc_status()` | ⬜ |
-| 6.1.4 | `kernel/kmalloc.c` | Create source file with includes | ⬜ |
+| 6.1.1 | `kernel/kmalloc.h` | Define constants: `HEAP_START`, `HEAP_END`, `HEAP_SIZE` | ✅ |
+| 6.1.2 | `kernel/kmalloc.h` | Define `block_header` struct (size, is_free) | ✅ |
+| 6.1.3 | `kernel/kmalloc.h` | Declare function prototypes: `kmalloc()`, `kfree()`, `kmalloc_init()`, `kmalloc_status()` | ✅ |
+| 6.1.4 | `kernel/kmalloc.c` | Create source file with includes | ✅ |
 
 **Expected `kmalloc.h`:**
 ```c
@@ -156,14 +158,14 @@ void kmalloc_status();                       // Print heap statistics (for debug
 #endif
 ```
 
-### Phase 6.2: Heap Initialization ⬜ NOT STARTED
+### Phase 6.2: Heap Initialization ✅ COMPLETED
 
 | Task | File | Description | Status |
 |------|------|-------------|--------|
-| 6.2.1 | `kernel/kmalloc.c` | Write `kmalloc_init()` - set up initial free block | ⬜ |
-| 6.2.2 | `kernel/kmalloc.c` | Create first block spanning entire heap | ⬜ |
-| 6.2.3 | `kernel/kmalloc.c` | Set block size = `HEAP_SIZE`, is_free = 1 | ⬜ |
-| 6.2.4 | `kernel/kernel_main.c` | Call `kmalloc_init()` during kernel startup | ⬜ |
+| 6.2.1 | `kernel/kmalloc.c` | Write `kmalloc_init()` - set up initial free block | ✅ |
+| 6.2.2 | `kernel/kmalloc.c` | Create first block spanning entire heap | ✅ |
+| 6.2.3 | `kernel/kmalloc.c` | Set block size = `HEAP_SIZE`, is_free = 1 | ✅ |
+| 6.2.4 | `kernel/kernel_main.c` | Call `kmalloc_init()` during kernel startup | ✅ |
 
 **Implementation:**
 ```c
@@ -190,16 +192,16 @@ void main() {
 }
 ```
 
-### Phase 6.3: Memory Allocation (kmalloc) ⬜ NOT STARTED
+### Phase 6.3: Memory Allocation (kmalloc) ✅ COMPLETED
 
 | Task | File | Description | Status |
 |------|------|-------------|--------|
-| 6.3.1 | `kernel/kmalloc.c` | Start `kmalloc()` function - align size to 4 bytes | ⬜ |
-| 6.3.2 | `kernel/kmalloc.c` | Add header size to requested size | ⬜ |
-| 6.3.3 | `kernel/kmalloc.c` | Implement best-fit search algorithm | ⬜ |
-| 6.3.4 | `kernel/kmalloc.c` | Split large blocks if remainder > MIN_ALLOC_SIZE | ⬜ |
-| 6.3.5 | `kernel/kmalloc.c` | Mark block as allocated, return payload pointer | ⬜ |
-| 6.3.6 | `kernel/kmalloc.c` | Handle allocation failure (return NULL) | ⬜ |
+| 6.3.1 | `kernel/kmalloc.c` | Start `kmalloc()` function - align size to 4 bytes | ✅ |
+| 6.3.2 | `kernel/kmalloc.c` | Add header size to requested size | ✅ |
+| 6.3.3 | `kernel/kmalloc.c` | Implement best-fit search algorithm | ✅ |
+| 6.3.4 | `kernel/kmalloc.c` | Split large blocks if remainder > MIN_ALLOC_SIZE | ✅ |
+| 6.3.5 | `kernel/kmalloc.c` | Mark block as allocated, return payload pointer | ✅ |
+| 6.3.6 | `kernel/kmalloc.c` | Handle allocation failure (return NULL) | ✅ |
 
 **Algorithm:**
 ```c
@@ -259,15 +261,15 @@ void* kmalloc(uint32_t size) {
 }
 ```
 
-### Phase 6.4: Memory Deallocation (kfree) ⬜ NOT STARTED
+### Phase 6.4: Memory Deallocation (kfree) ✅ COMPLETED
 
 | Task | File | Description | Status |
 |------|------|-------------|--------|
-| 6.4.1 | `kernel/kmalloc.c` | Start `kfree()` - validate pointer is not NULL | ⬜ |
-| 6.4.2 | `kernel/kmalloc.c` | Get block header from user pointer | ⬜ |
-| 6.4.3 | `kernel/kmalloc.c` | Mark block as free | ⬜ |
-| 6.4.4 | `kernel/kmalloc.c` | Implement forward coalescing - merge with next block if free | ⬜ |
-| 6.4.5 | `kernel/kmalloc.c` | Implement backward coalescing - merge with previous block if free | ⬜ |
+| 6.4.1 | `kernel/kmalloc.c` | Start `kfree()` - validate pointer is not NULL | ✅ |
+| 6.4.2 | `kernel/kmalloc.c` | Get block header from user pointer | ✅ |
+| 6.4.3 | `kernel/kmalloc.c` | Mark block as free | ✅ |
+| 6.4.4 | `kernel/kmalloc.c` | Implement forward coalescing - merge with next block if free | ✅ |
+| 6.4.5 | `kernel/kmalloc.c` | Implement backward coalescing - merge with previous block if free | ✅ |
 
 **Algorithm:**
 ```c
@@ -308,14 +310,14 @@ void kfree(void* ptr) {
 }
 ```
 
-### Phase 6.5: Debugging & Statistics ⬜ NOT STARTED
+### Phase 6.5: Debugging & Statistics ✅ COMPLETED
 
 | Task | File | Description | Status |
 |------|------|-------------|--------|
-| 6.5.1 | `kernel/kmalloc.c` | Write `kmalloc_status()` - scan heap and print stats | ⬜ |
-| 6.5.2 | `kernel/kmalloc.c` | Count total blocks, free blocks, allocated blocks | ⬜ |
-| 6.5.3 | `kernel/kmalloc.c` | Calculate total free memory, total allocated memory | ⬜ |
-| 6.5.4 | `kernel/kmalloc.c` | Print fragmentation info (number of free blocks) | ⬜ |
+| 6.5.1 | `kernel/kmalloc.c` | Write `kmalloc_status()` - scan heap and print stats | ✅ |
+| 6.5.2 | `kernel/kmalloc.c` | Count total blocks, free blocks, allocated blocks | ✅ |
+| 6.5.3 | `kernel/kmalloc.c` | Calculate total free memory, total allocated memory | ✅ |
+| 6.5.4 | `kernel/kmalloc.c` | Print fragmentation info (number of free blocks) | ✅ |
 
 **Implementation:**
 ```c
@@ -359,16 +361,16 @@ void kmalloc_status() {
 }
 ```
 
-### Phase 6.6: Testing ⬜ NOT STARTED
+### Phase 6.6: Testing ✅ COMPLETED
 
 | Task | File | Description | Status |
 |------|------|-------------|--------|
-| 6.6.1 | `kernel/kernel_main.c` | Test 1: Single allocation and free | ⬜ |
-| 6.6.2 | `kernel/kernel_main.c` | Test 2: Multiple allocations | ⬜ |
-| 6.6.3 | `kernel/kernel_main.c` | Test 3: Write data to allocated memory | ⬜ |
-| 6.6.4 | `kernel/kernel_main.c` | Test 4: Test forward and backward coalescing | ⬜ |
-| 6.6.5 | `kernel/kernel_main.c` | Test 5: Exhaust heap (handle NULL return) | ⬜ |
-| 6.6.6 | Remove test code | Clean up kernel_main.c after verification | ⬜ |
+| 6.6.1 | `kernel/kernel_main.c` | Test 1: Single allocation and free | ✅ |
+| 6.6.2 | `kernel/kernel_main.c` | Test 2: Multiple allocations | ✅ |
+| 6.6.3 | `kernel/kernel_main.c` | Test 3: Write data to allocated memory | ✅ |
+| 6.6.4 | `kernel/kernel_main.c` | Test 4: Test forward and backward coalescing | ✅ |
+| 6.6.5 | `kernel/kernel_main.c` | Test 5: Exhaust heap (handle NULL return) | ✅ |
+| 6.6.6 | Remove test code | Clean up kernel_main.c after verification | ✅ |
 
 **Test Code Examples:**
 ```c
@@ -437,13 +439,13 @@ void test_kmalloc() {
 }
 ```
 
-### Phase 6.7: Build Integration ⬜ NOT STARTED
+### Phase 6.7: Build Integration ✅ COMPLETED
 
 | Task | File | Description | Status |
 |------|------|-------------|--------|
-| 6.7.1 | `makefile` | Add `kernel/kmalloc.c` to C_SOURCES | ⬜ |
-| 6.7.2 | `makefile` | Verify kernel builds successfully | ⬜ |
-| 6.7.3 | `makefile` | Test in QEMU - run test suite | ⬜ |
+| 6.7.1 | `makefile` | Add `kernel/kmalloc.c` to C_SOURCES | ✅ |
+| 6.7.2 | `makefile` | Verify kernel builds successfully | ✅ |
+| 6.7.3 | `makefile` | Test in QEMU - run test suite | ✅ |
 
 ---
 
@@ -547,18 +549,18 @@ main()
 
 ## Verification Checklist
 
-After implementing each phase, verify:
+All items verified and completed:
 
-- [ ] Heap initializes without errors
-- [ ] Single allocation succeeds and returns valid pointer
-- [ ] Can write to allocated memory without crash
-- [ ] Can allocate multiple blocks
-- [ ] Freeing memory marks block as free
-- [ ] Forward coalescing merges with next free block
-- [ ] Backward coalescing merges with previous free block
-- [ ] `kmalloc_status()` shows correct statistics
-- [ ] Allocation fails gracefully when heap exhausted (returns NULL)
-- [ ] No kernel panics or triple faults during tests
+- [x] Heap initializes without errors
+- [x] Single allocation succeeds and returns valid pointer
+- [x] Can write to allocated memory without crash
+- [x] Can allocate multiple blocks
+- [x] Freeing memory marks block as free
+- [x] Forward coalescing merges with next free block
+- [x] Backward coalescing merges with previous free block
+- [x] `kmalloc_status()` shows correct statistics
+- [x] Allocation fails gracefully when heap exhausted (returns NULL)
+- [x] No kernel panics or triple faults during tests
 
 ---
 

@@ -1,5 +1,5 @@
 # ApPa
-Interactive x86 OS with keyboard input support!
+Interactive x86 OS with keyboard input support and dynamic memory allocation!
 
 ## How to Build and Run
 
@@ -13,8 +13,22 @@ ApPa Kernel v0.1
 Initializing interrupt system...
   [OK] IDT initialized
   [OK] PIC remapped
+  [OK] Kernel heap initialized
   [OK] Keyboard initialized
   [OK] Interrupts enabled
+
+=====================================
+       RUNNING UNIT TESTS
+=====================================
+
+=== Testing va_list system ===
+First: Hello
+Second (int): 42
+Third (string): World
+=====================================
+       ALL TESTS COMPLETED
+=====================================
+
 
 System ready. Type something!
 > 
@@ -51,23 +65,19 @@ System ready. Type something!
   - Keyboard driver initialization
   - Interrupts enabled globally
   - **FULLY FUNCTIONAL KEYBOARD INPUT!**
+- ✅ **Phase 6: Dynamic Memory Allocator (Heap)** - COMPLETED
+  - Best-fit allocation algorithm (minimizes fragmentation)
+  - `kmalloc()` - allocate variable-sized memory blocks
+  - `kfree()` - free memory with forward and backward coalescing
+  - `kmalloc_init()` - heap initialization (1MB-2MB region)
+  - `kmalloc_status()` - debugging statistics
+  - **DYNAMIC MEMORY ALLOCATION WORKING!**
 
 ---
 
 ## Next Steps
 
-### Phase 6: Dynamic Memory Allocator (Heap) - **NEXT**
-**Priority:** High | **Estimated:** 1-2 days  
-**Why first:** Foundation for all dynamic data structures. Required for shell, file systems, and future features.
-
-**Implementation:**
-- `kernel/kmalloc.c` / `kmalloc.h` - Heap allocator implementation
-- Start with simple first-fit or bitmap allocator
-- Functions: `kmalloc()`, `kfree()`, `kmalloc_status()` (for debugging)
-- Define heap region (e.g., 1MB-2MB in physical memory)
-- Track allocated/free blocks with metadata headers
-
-### Phase 7: Simple Command Shell
+### Phase 7: Simple Command Shell - **NEXT**
 **Priority:** High | **Estimated:** 1 day  
 **Why:** Makes keyboard input actually useful! Good practice for string handling.
 
@@ -197,3 +207,25 @@ nasm -f bin boot/boot_sector.asm -o /dev/null -l /dev/stdout | grep KERNEL_SECTO
 # Or: hexdump -C bin/boot_sector.bin | grep "b6 00"
 ```
 Update `SECTOR_PATCH_OFFSET` in `makefile` accordingly.
+
+---
+
+## Project Structure
+
+```
+ApPa/
+├── boot/              # Bootloader and boot-time assembly
+├── drivers/           # Hardware drivers (keyboard, screen, ports)
+├── kernel/            # Core kernel (IDT, IRQ, ISR, PIC, memory allocation)
+├── libc/              # Standard C library headers (stdint, stddef, stdarg)
+├── tests/             # Unit tests (run automatically at boot)
+├── Information/       # Documentation and implementation guides
+├── bin/               # Build artifacts (generated)
+├── makefile           # Build system
+└── README.md          # This file
+```
+
+### Key Directories:
+- **tests/** - Unit testing framework. See [tests/README.md](tests/README.md) for details.
+- **Information/** - Detailed guides for each implementation phase.
+- **libc/** - Kernel-compatible C library functions.
