@@ -1,4 +1,5 @@
 #include "screen.h"
+#include "serial.h"
 
 //private functions
 
@@ -34,6 +35,8 @@ void kprint_at(const char* msg, int col, int row) {
 
 	for (int i = 0; msg[i] != 0; i++) {
 		offset = print_char(msg[i], col, row, WHITE_ON_BLACK);
+		// Also output to serial port for -nographic mode
+		serial_putc(msg[i]);
 		row = get_offset_row(offset);
 		col = get_offset_col(offset);
 	}

@@ -42,6 +42,7 @@ void utoa(uint32_t value, char* str, int base) {
 void itoa(int32_t value, char* str, int base) {
     int i = 0;
     int is_negative = 0;
+    uint32_t uvalue;
     
     // Handle 0 explicitly
     if (value == 0) {
@@ -53,14 +54,16 @@ void itoa(int32_t value, char* str, int base) {
     // Handle negative numbers (only for base 10)
     if (value < 0 && base == 10) {
         is_negative = 1;
-        value = -value;
+        uvalue = (uint32_t)(-value);  // Convert to unsigned to avoid overflow
+    } else {
+        uvalue = (uint32_t)value;
     }
     
     // Process individual digits
-    while (value != 0) {
-        int rem = value % base;
+    while (uvalue != 0) {
+        int rem = uvalue % base;
         str[i++] = (rem > 9) ? (rem - 10) + 'a' : rem + '0';
-        value = value / base;
+        uvalue = uvalue / base;
     }
     
     // Add negative sign

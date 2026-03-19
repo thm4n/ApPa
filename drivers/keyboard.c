@@ -2,6 +2,7 @@
 #include "screen.h"
 #include "ports.h"
 #include "../kernel/isr.h"
+#include "../kernel/klog.h"
 
 /*
  * PS/2 Keyboard Driver
@@ -33,6 +34,14 @@ static void keyboard_handler(registers_t* regs) {
     if (scancode & 0x80) {
         // Ignore key release events for now
         // Advanced keyboards might need this for key repeat, chords, etc.
+        return;
+    }
+    
+    // Handle special function keys
+    if (scancode == 0x3B) {  // F1 key
+        kprint("\n");
+        klog_dump();
+        kprint("> ");
         return;
     }
     

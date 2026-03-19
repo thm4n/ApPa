@@ -5,10 +5,14 @@
 
 void test_printf() {
     kprint("\n=== Testing kprintf ===\n");
+    kprint("About to test signed integers...\n");
     
     // Test 1: Signed integers
     kprint("Test 1: Signed integers (%d)\n");
+    kprint("Testing positive...\n");
     kprintf("  Positive: %d\n", 42);
+    kprint("Done with positive\n");
+    
     kprintf("  Negative: %d\n", -42);
     kprintf("  Zero: %d\n", 0);
     kprintf("  Large: %d\n", 2147483647);

@@ -1,13 +1,18 @@
 #include "../drivers/screen.h"
+#include "../drivers/serial.h"
 #include "idt.h"
 #include "pic.h"
 #include "../drivers/keyboard.h"
 #include "kmalloc.h"
+#include "klog.h"
 #include "../tests/tests.h"
 
 void __stack_chk_fail() {}
 
 void main() {
+	// Initialize serial port for -nographic mode
+	serial_init();
+	
 	// Clear screen and print welcome message
 	clear_screen();
 	kprint("ApPa Kernel v0.1\n");
@@ -29,6 +34,13 @@ void main() {
 	// Sets up the initial free block for dynamic memory allocation
 	kmalloc_init();
 	kprint("  [OK] Kernel heap initialized\n");
+
+	// Phase 3.5: Initialize kernel logging system
+	// Sets up circular buffer for persistent kernel logs
+	//klog_init();  // DISABLED FOR DEBUGGING
+	kprint("  [OK] Kernel logging initialized (DISABLED FOR DEBUG)\n");
+	//klog_info("ApPa Kernel v0.1 booting...");
+	//klog_info("Memory, IDT, and PIC configured");
 
 	// Phase 4: Initialize keyboard driver
 	// Registers a handler for IRQ1 (keyboard interrupt)
