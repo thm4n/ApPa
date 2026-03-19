@@ -86,37 +86,21 @@ ApPa Shell v0.1 - Type 'help' for commands
     - `color <name>` - Change text color (16 VGA colors supported)
   - VGA color system with foreground/background support
   - String utilities (`strncmp` for command parsing)
-  - **INTERACTIVE SHELL WORKING!**
+- ✅ **Phase 8: Timer (PIT - IRQ0)** - COMPLETED
+  - Dedicated timer module (`kernel/timer.c` and `kernel/timer.h`)
+  - IRQ0 interrupt handler for timer tick tracking
+  - Visual tick counter in top-right corner
+  - Uptime tracking functions: `get_uptime_seconds()`, `get_uptime_string()`
+  - `uptime` command in shell displays system uptime
+  - String utility functions: `strcat()`, `uitoa()` for formatting
+  - PIT configured at 100Hz (10ms tick intervals)
+  - **SYSTEM TIMER WORKING!**
 
 ---
 
 ## Next Steps
 
-### Phase 8: Timer (PIT - IRQ0) - **NEXT**
-**Priority:** High | **Estimated:** 1 day  
-**Why:** Makes keyboard input actually useful! Good practice for string handling.
-
-**Features:**
-- Command buffer and parsing (using kmalloc for buffers)
-- Built-in commands:
-  - `help` - List available commands
-  - `clear` - Clear screen
-  - `echo <text>` - Print text
-  - `mem` - Show memory allocation statistics
-  - `uptime` - Show system uptime (after timer implementation)
-- Command history (optional enhancement)
-
-### Phase 8: Timer (PIT - IRQ0)
-**Priority:** Medium | **Estimated:** 1 day  
-**Why:** Track system uptime, foundation for multitasking scheduler.
-
-**Implementation:**
-- `drivers/timer.c` / `timer.h` - PIT driver
-- Configure PIT (Programmable Interval Timer) on IRQ0
-- Track ticks since boot
-- Convert ticks to seconds/minutes for uptime display
-
-### Phase 9: Physical Memory Manager
+### Phase 9: Physical Memory Manager - **NEXT**
 **Priority:** High | **Estimated:** 2-3 days  
 **Why:** Proper RAM detection and tracking. Required before paging.
 
