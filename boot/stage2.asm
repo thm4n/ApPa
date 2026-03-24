@@ -3,7 +3,7 @@
 ; Loads the full kernel from disk, switches to protected mode, and jumps to it
 
 [bits 16]
-[org 0x9000]
+[org 0x0600]
 
 ; Memory configuration
 %ifndef KERNEL_OFFSET
@@ -17,6 +17,16 @@
 stage2_start:
 	; Boot drive is passed in DL by boot sector
 	mov [BOOT_DRIVE], dl
+
+	; CRITICAL: Relocate stack above kernel binary load area
+	; Boot sector set SP=0x9000, but kernel binary loads to 0x1000-0x90B0+
+	; which overwrites the stack during INT 13h reads.
+	; Move stack to SS:SP = 0x7000:0x0000 → physical 0x70000-0x7FFFE
+	; This is safely above the kernel load area (~0x90B0) and below VGA (0xA0000)
+	mov ax, 0x7000
+	mov ss, ax
+	xor sp, sp
+	mov bp, sp
 	
 	mov si, MSG_STAGE2
 	call print_rm

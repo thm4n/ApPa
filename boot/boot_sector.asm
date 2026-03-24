@@ -20,7 +20,7 @@
 	call load_stage2
 	
 	; Jump to stage2 which will load kernel and switch to PM
-	jmp 0x9000
+	jmp 0x0000:0x0600
 
 %include "boot/print.asm"
 %include "boot/print_hex.asm"
@@ -32,8 +32,9 @@ load_stage2:
 	call print
 	call print_nl
 
-	; Load stage 2 bootloader (4 sectors at 0x9000)
-	mov bx, 0x9000            ; Load stage2 above kernel to avoid overwrite
+	; Load stage 2 bootloader (4 sectors at 0x0600)
+	; Placed below kernel (0x1000) so kernel load can't overwrite it
+	mov bx, 0x0600            ; Load stage2 at 0x0600 (0x0600-0x0DFF = 2KB)
 	mov dh, 4                 ; Load 4 sectors (2KB for stage2)
 	mov dl, [BOOT_DRIVE]
 	call disk_load

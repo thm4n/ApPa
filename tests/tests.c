@@ -27,7 +27,10 @@ void run_all_tests() {
     kprint("\n>>> Starting test_pmm...\n");
     test_pmm();
     kprint(">>> CHECKPOINT 4: test_pmm COMPLETE\n");
-	
+    // Test 5: paging subsystem
+    kprint("\n>>> Starting test_paging...\n");
+    test_paging();
+    kprint(">>> CHECKPOINT 5: test_paging COMPLETE\n");	
 	kprint("\n=====================================\n");
 	kprint("       ALL TESTS COMPLETED\n");
 	kprint("=====================================\n");

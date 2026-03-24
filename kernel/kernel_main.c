@@ -6,6 +6,7 @@
 #include "pit.h"
 #include "timer.h"
 #include "pmm.h"
+#include "paging.h"
 #include "../drivers/keyboard.h"
 #include "kmalloc.h"
 #include "klog.h"
@@ -60,7 +61,12 @@ void main() {
 	pmm_init();
 	kprint("  [OK] Physical memory manager initialized\n");
 
-	// Phase 4.5: Initialize kernel logging system
+	// Phase 4.5: Enable paging with identity mapping
+	// Sets up page directory + 4 page tables covering 0-16MB
+	paging_init();
+	kprint("  [OK] Paging enabled (identity map 0-16MB)\n");
+
+	// Phase 4.75: Initialize kernel logging system
 	// Sets up circular buffer for persistent kernel logs
 	//klog_init();  // DISABLED FOR DEBUGGING
 	kprint("  [OK] Kernel logging initialized (DISABLED FOR DEBUG)\n");

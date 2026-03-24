@@ -65,6 +65,13 @@ $(info CCFLAGS   = $(CCFLAGS))
 $(info LDFLAGS   = $(LDFLAGS))
 $(info ==========================================)
 
+# Default target: build the bootable image
+# Default target
+all: build
+
+# Build only (no QEMU)
+build: $(BIN_DIR)/image.bin
+
 # Ensure bin directory exists
 $(BIN_DIR):
 	@mkdir -p $(BIN_DIR)
@@ -75,7 +82,7 @@ check:
 
 # Stage2 patch offset (location of sectors_remaining immediate value in stage2.asm)
 # Use: nasm boot/stage2.asm -o /tmp/s2.bin -l /tmp/s2.lst && grep -A1 KERNEL_SECTORS_STAGE2_PATCH /tmp/s2.lst
-STAGE2_PATCH_OFFSET = 0x36
+STAGE2_PATCH_OFFSET = 0x3F
 
 $(BIN_DIR)/stage2.bin: boot/stage2.asm | $(BIN_DIR)
 	@echo "[DEBUG] Assembling stage2 bootloader: $< -> $@"
@@ -108,24 +115,20 @@ $(BIN_DIR)/kernel.elf: boot/kernel_entry.o ${OBJ} ${KERNEL_ASM_OBJ} | $(BIN_DIR)
 	${LD} ${LDFLAGS} -o $@ -Ttext 0x1000 $^
 	@echo "[DEBUG] Created $@ successfully"
 
-run: $(BIN_DIR)/image.bin 
-	@echo "[DEBUG] Running QEMU with image: $<"
+# Run QEMU with graphical display window
+run-graphics: $(BIN_DIR)/image.bin
+	@echo "[DEBUG] Running QEMU (graphics): $<"
 	qemu-system-i386 -s -drive file=$<,format=raw
 
-run-curses: $(BIN_DIR)/image.bin
-	@echo "[DEBUG] Running QEMU in curses mode (CLI): $<"
-	qemu-system-i386 -s -drive file=$<,format=raw -display curses
+# Run QEMU with serial output tee'd to stdout and last_run.log
+run-term: $(BIN_DIR)/image.bin
+	@echo "[DEBUG] Running QEMU (terminal): $<"
+	@echo "[INFO] Output: stdout + last_run.log | Ctrl+A then X to exit"
+	@rm -f last_run.log
+	qemu-system-i386 -s -drive file=$<,format=raw -serial mon:stdio -nographic 2>&1 | tee last_run.log
 
-run-nographic: $(BIN_DIR)/image.bin
-	@echo "[DEBUG] Running QEMU in nographic mode (text only): $<"
-	@echo "[INFO] Serial output on stdio, Ctrl+A then C for QEMU monitor, Ctrl+A then X to exit"
-	qemu-system-i386 -s -drive file=$<,format=raw -serial mon:stdio -nographic
-
-run-debug-log: $(BIN_DIR)/image.bin
-	@echo "[DEBUG] Running QEMU with serial output logged to debug.log"
-	@echo "[INFO] All kernel output will be saved to debug.log"
-	@rm -f debug.log
-	qemu-system-i386 -s -drive file=$<,format=raw -serial file:debug.log -nographic -monitor stdio
+# Aliases for convenience
+run: run-graphics
 
 debug: $(BIN_DIR)/image.bin $(BIN_DIR)/kernel.elf
 	@echo "[DEBUG] Starting debug session"
@@ -159,4 +162,5 @@ clean:
 	@echo "[DEBUG] Removing: $(wildcard *.o */*.o)"
 	rm -f $(wildcard *.o */*.o)
 	@echo "[DEBUG] Clean complete"
-	@echo "[DEBUG] Clean complete"
+
+.PHONY: all build run run-graphics run-term debug clean check

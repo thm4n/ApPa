@@ -3,6 +3,7 @@
 #include "../libc/string.h"
 #include "kmalloc.h"
 #include "pmm.h"
+#include "paging.h"
 #include "timer.h"
 
 /*
@@ -23,6 +24,7 @@ static void cmd_mem(void);
 static void cmd_pmem(void);
 static void cmd_color(const char* args);
 static void cmd_uptime(void);
+static void cmd_pagedir(void);
 
 /**
  * shell_init - Initialize the shell
@@ -109,6 +111,8 @@ void shell_execute(const char* cmd) {
 		cmd_color(args);
 	} else if (strncmp(cmd, "uptime", cmd_len) == 0 && cmd_len == 6) {
 		cmd_uptime();
+	} else if (strncmp(cmd, "pagedir", cmd_len) == 0 && cmd_len == 7) {
+		cmd_pagedir();
 	} else {
 		kprint("Unknown command: ");
 		kprint((char*)cmd);
@@ -127,6 +131,7 @@ static void cmd_help(void) {
 	kprint("  mem          - Display memory allocation statistics\n");
 	kprint("  pmem         - Display physical memory statistics\n");
 	kprint("  uptime       - Show system uptime\n");
+	kprint("  pagedir      - Display page directory info\n");
 	kprint("  color <name> - Change text color\n");
 	kprint("               Colors: white, red, green, blue, yellow,\n");
 	kprint("                       cyan, magenta, grey, black\n");
@@ -173,6 +178,13 @@ static void cmd_uptime(void) {
 	kprint("System uptime: ");
 	kprint(uptime_str);
 	kprint("\n");
+}
+
+/**
+ * cmd_pagedir - Display page directory information
+ */
+static void cmd_pagedir(void) {
+	paging_status();
 }
 
 /**

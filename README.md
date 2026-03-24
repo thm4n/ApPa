@@ -107,23 +107,23 @@ ApPa Shell v0.1 - Type 'help' for commands
   - `pmm` shell command and `pmm_status()` integrated into shell
   - Unit tests: 15 tests covering allocation, freeing, contiguous alloc, double-free detection, unaligned/OOR rejection, zero-alloc, pool range validation, and stress testing
   - **PHYSICAL MEMORY MANAGER WORKING!**
+- ✅ **Phase 10: Paging / Virtual Memory (MMU)** - COMPLETED
+  - Two-level page table structure (Page Directory + Page Tables) for x86 4 KB paging
+  - Identity mapping of first 16 MB (virtual == physical) — 5 PMM frames used (20 KB)
+  - `paging_init()` - Allocate PD + 4 PTs, fill identity map, load CR3, set CR0.PG
+  - `paging_map_page()` / `paging_unmap_page()` - Dynamic page mapping with auto PT allocation
+  - `paging_translate()` - Software page table walk returning physical address
+  - `page_fault_handler()` - ISR 14 with CR2 read, error code decode, diagnostic output
+  - `paging_status()` - Print PD summary (present tables, mapped pages, mapped MB)
+  - `pagedir` shell command for inspecting page directory state
+  - Unit tests: 8 tests covering identity map correctness, boundary pages, unmapped detection, dynamic map/unmap
+  - **PAGING ENABLED!**
 
 ---
 
 ## Next Steps
 
-### Phase 10: Paging / Virtual Memory (MMU) - **NEXT**
-**Priority:** High | **Estimated:** 3-5 days  
-**Why:** Memory protection, process isolation, enables userspace programs.
-
-**Implementation:**
-- `kernel/paging.c` / `paging.h` - Page table management
-- Identity mapping for kernel (virtual = physical)
-- Enable CR0.PG bit to activate MMU
-- Page fault handler (ISR 14)
-- Separate address spaces for future processes
-
-### Phase 11: File System & Disk I/O
+### Phase 11: File System & Disk I/O - **NEXT**
 **Priority:** Medium | **Estimated:** 5-7 days  
 **Why:** Persistent storage, load programs from disk.
 
