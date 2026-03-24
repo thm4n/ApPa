@@ -2,6 +2,7 @@
 #include "../drivers/screen.h"
 #include "../libc/string.h"
 #include "kmalloc.h"
+#include "pmm.h"
 #include "timer.h"
 
 /*
@@ -19,6 +20,7 @@ static void cmd_help(void);
 static void cmd_clear(void);
 static void cmd_echo(const char* args);
 static void cmd_mem(void);
+static void cmd_pmem(void);
 static void cmd_color(const char* args);
 static void cmd_uptime(void);
 
@@ -101,6 +103,8 @@ void shell_execute(const char* cmd) {
 		cmd_echo(args);
 	} else if (strncmp(cmd, "mem", cmd_len) == 0 && cmd_len == 3) {
 		cmd_mem();
+	} else if (strncmp(cmd, "pmem", cmd_len) == 0 && cmd_len == 4) {
+		cmd_pmem();
 	} else if (strncmp(cmd, "color", cmd_len) == 0 && cmd_len == 5) {
 		cmd_color(args);
 	} else if (strncmp(cmd, "uptime", cmd_len) == 0 && cmd_len == 6) {
@@ -121,6 +125,7 @@ static void cmd_help(void) {
 	kprint("  clear        - Clear the screen\n");
 	kprint("  echo <text>  - Print text to screen\n");
 	kprint("  mem          - Display memory allocation statistics\n");
+	kprint("  pmem         - Display physical memory statistics\n");
 	kprint("  uptime       - Show system uptime\n");
 	kprint("  color <name> - Change text color\n");
 	kprint("               Colors: white, red, green, blue, yellow,\n");
@@ -150,6 +155,13 @@ static void cmd_echo(const char* args) {
  */
 static void cmd_mem(void) {
 	kmalloc_status();
+}
+
+/**
+ * cmd_pmem - Display physical memory allocation statistics
+ */
+static void cmd_pmem(void) {
+	pmm_status();
 }
 
 /**

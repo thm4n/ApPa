@@ -164,6 +164,8 @@ void isr_handler(registers_t* regs) {
     }
 
     // Default handler: print exception info
+    // Disable interrupts to prevent timer from corrupting output
+    __asm__ volatile("cli");
     kprint("\n========== CPU EXCEPTION ==========\n");
     kprint("Exception: ");
     if (regs->int_no < 32) {

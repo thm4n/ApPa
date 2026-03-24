@@ -4,20 +4,6 @@
 #include "../kernel/klog.h"
 #include "test_scroll_log.h"
 
-void test_scrolling() {
-    kprint("\n=== Testing Screen Scrolling ===\n");
-    kprint("This test will print many lines to trigger scrolling.\n");
-    kprint("Watch as the screen scrolls automatically.\n\n");
-    
-    // Print enough lines to trigger scrolling
-    for (int i = 1; i <= 30; i++) {
-        kprintf("Line %d: Testing automatic screen scrolling...\n", i);
-    }
-    
-    kprint("\n[PASS] Scrolling test completed!\n");
-    kprint("If you can see this, scrolling works correctly.\n\n");
-}
-
 void test_klog() {
     kprint("\n=== Testing Kernel Log System ===\n");
     

@@ -73,28 +73,27 @@ check:
 	@echo "[DEBUG] check: Listing C sources"
 	echo ${C_SOURCES}
 
-# Sector count patch offset in boot_sector.bin (location of 'mov dh, X' immediate)
-# Use: nasm -f bin boot/boot_sector.asm -o /dev/null -l /dev/stdout | grep KERNEL_SECTORS_PATCH
-# to recalculate if boot sector changes significantly
-SECTOR_PATCH_OFFSET = 0x142
+# Stage2 patch offset (location of sectors_remaining immediate value in stage2.asm)
+# Use: nasm boot/stage2.asm -o /tmp/s2.bin -l /tmp/s2.lst && grep -A1 KERNEL_SECTORS_STAGE2_PATCH /tmp/s2.lst
+STAGE2_PATCH_OFFSET = 0x36
 
-$(BIN_DIR)/image.bin: $(BIN_DIR)/boot_sector.bin $(BIN_DIR)/kernel.bin | $(BIN_DIR)
-	@echo "[DEBUG] Building target: $@"
-	@# Calculate required sectors (rounded up)
+$(BIN_DIR)/stage2.bin: boot/stage2.asm | $(BIN_DIR)
+	@echo "[DEBUG] Assembling stage2 bootloader: $< -> $@"
+	nasm -D KERNEL_OFFSET=$(KERNEL_OFFSET) -D STACK_BASE=$(STACK_BASE) boot/stage2.asm -f bin -o $@
+	@echo "[DEBUG] Created $@ successfully"
+
+$(BIN_DIR)/image.bin: $(BIN_DIR)/boot_sector.bin $(BIN_DIR)/stage2.bin $(BIN_DIR)/kernel.bin | $(BIN_DIR)
+	@echo "[DEBUG] Building two-stage bootloader image: $@"
+	@# Calculate required sectors for kernel (rounded up)
 	@KERNEL_SIZE=$$(stat -c%s $(BIN_DIR)/kernel.bin); \
 	SECTORS=$$(( ($$KERNEL_SIZE + 511) / 512 )); \
-	if [ $$SECTORS -gt 63 ]; then \
-		echo "ERROR: kernel.bin ($$KERNEL_SIZE bytes, $$SECTORS sectors) exceeds 63 sectors (32KB)"; \
-		echo "You need to implement a two-stage bootloader. See README.md"; \
-		exit 1; \
-	fi; \
 	echo "[DEBUG] Kernel size: $$KERNEL_SIZE bytes, requires $$SECTORS sectors"; \
-	python3 -c "import sys; sys.stdout.buffer.write(bytes([$$SECTORS]))" | dd of=$(BIN_DIR)/boot_sector.bin bs=1 seek=$$(($(SECTOR_PATCH_OFFSET))) conv=notrunc status=none; \
-	echo "[DEBUG] Patched boot sector to load $$SECTORS sectors"; \
-	cat $(BIN_DIR)/boot_sector.bin $(BIN_DIR)/kernel.bin > $@; \
-	IMAGE_SIZE=$$((512 + $$SECTORS * 512)); \
+	python3 -c "import sys; sys.stdout.buffer.write(bytes([$$SECTORS]))" | dd of=$(BIN_DIR)/stage2.bin bs=1 seek=$$(($(STAGE2_PATCH_OFFSET))) conv=notrunc status=none; \
+	echo "[DEBUG] Patched stage2 to load $$SECTORS kernel sectors"; \
+	cat $(BIN_DIR)/boot_sector.bin $(BIN_DIR)/stage2.bin $(BIN_DIR)/kernel.bin > $@; \
+	IMAGE_SIZE=$$((512 + 2048 + $$SECTORS * 512)); \
 	dd if=/dev/zero of=$@ bs=1 count=0 seek=$$IMAGE_SIZE 2>/dev/null; \
-	echo "[DEBUG] Created $@ successfully ($$IMAGE_SIZE bytes)"
+	echo "[DEBUG] Created $@ successfully ($$IMAGE_SIZE bytes: 512B boot + 2KB stage2 + $$KERNEL_SIZE kernel)"
 $(BIN_DIR)/kernel.bin: boot/kernel_entry.o ${OBJ} ${KERNEL_ASM_OBJ} | $(BIN_DIR)
 	@echo "[DEBUG] Building target: $@"
 	@echo "[DEBUG] Linking objects: $^"

@@ -95,23 +95,24 @@ ApPa Shell v0.1 - Type 'help' for commands
   - String utility functions: `strcat()`, `uitoa()` for formatting
   - PIT configured at 100Hz (10ms tick intervals)
   - **SYSTEM TIMER WORKING!**
+- ✅ **Phase 9: Physical Memory Manager (PMM)** - COMPLETED
+  - Bitmap allocator managing 16MB of physical RAM at 4KB page granularity
+  - Bitmap placed at 2MB (after kernel heap), 512 bytes for 4096 frames
+  - `pmm_init()` - Initialize bitmap and mark reserved regions
+  - `alloc_page()` / `alloc_pages(count)` - Allocate single or contiguous pages
+  - `free_page()` - Free pages with alignment, bounds, and double-free validation
+  - `pmm_status()` - Display physical memory statistics
+  - `get_total_memory()`, `get_used_memory()`, `get_free_memory()` - Query functions
+  - Reserved regions: low memory (0-1MB), kernel heap (1-2MB), device memory (15-16MB)
+  - `pmm` shell command and `pmm_status()` integrated into shell
+  - Unit tests: 15 tests covering allocation, freeing, contiguous alloc, double-free detection, unaligned/OOR rejection, zero-alloc, pool range validation, and stress testing
+  - **PHYSICAL MEMORY MANAGER WORKING!**
 
 ---
 
 ## Next Steps
 
-### Phase 9: Physical Memory Manager - **NEXT**
-**Priority:** High | **Estimated:** 2-3 days  
-**Why:** Proper RAM detection and tracking. Required before paging.
-
-**Implementation:**
-- Detect available RAM (multiboot info or fixed size detection)
-- Page frame allocator (4KB pages)
-- Bitmap or stack-based free page tracking
-- Functions: `alloc_page()`, `free_page()`
-- Integrate with existing heap allocator
-
-### Phase 10: Paging / Virtual Memory (MMU)
+### Phase 10: Paging / Virtual Memory (MMU) - **NEXT**
 **Priority:** High | **Estimated:** 3-5 days  
 **Why:** Memory protection, process isolation, enables userspace programs.
 

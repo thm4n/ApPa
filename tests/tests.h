@@ -5,6 +5,7 @@
 #include "test_varargs.h"
 #include "test_printf.h"
 #include "test_scroll_log.h"
+#include "test_pmm.h"
 
 // Master function to run all tests
 void run_all_tests();

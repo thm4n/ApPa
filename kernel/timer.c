@@ -27,12 +27,6 @@ static void timer_handler(registers_t *regs) {
 	(void)regs;
 	
 	timer_ticks++;
-	
-	// Update counter on screen every tick (visual feedback)
-	// Position 158 = column 79, row 0 (top-right corner)
-	unsigned char *video = (unsigned char*)0xb8000;
-	video[158] = '0' + (timer_ticks % 10);
-	video[159] = 0x0C;  // Bright red on black
 }
 
 /**

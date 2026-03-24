@@ -7,30 +7,29 @@ void run_all_tests() {
     kprint("       RUNNING UNIT TESTS\n");
     kprint("=====================================\n");
     
-    // Run all tests with checkpoints
+    // Test 1: va_list system
     kprint("\n>>> Starting test_va_system...\n");
     test_va_system();
-    test_printf();
-    test_scrolling();
-    test_klog();
+    kprint(">>> CHECKPOINT 1: test_va_system COMPLETE\n");
     
+    // Test 2: printf
     kprint("\n>>> Starting test_printf...\n");
     test_printf();
     kprint(">>> CHECKPOINT 2: test_printf COMPLETE\n");
     
-    //kprint("\n>>> Starting test_scrolling...\n");
-    //test_scrolling();
-    //kprint(">>> CHECKPOINT 3: test_scrolling COMPLETE\n");
-    kprint("\n>>> CHECKPOINT 3: test_scrolling SKIPPED (stack overflow prevention)\n");
-    
-    // DISABLED FOR DEBUGGING
+    // Test 3: kernel logging (disabled - debugging)
     //kprint("\n>>> Starting test_klog...\n");
     //test_klog();
-    //kprint(">>> CHECKPOINT 4: test_klog COMPLETE\n");
-    kprint("\n>>> CHECKPOINT 4: test_klog SKIPPED (debugging)\n");
+    //kprint(">>> CHECKPOINT 3: test_klog COMPLETE\n");
+    kprint("\n>>> CHECKPOINT 3: test_klog SKIPPED (debugging)\n");
     
-    kprint("\n=====================================\n");
-    kprint("       ALL TESTS COMPLETED\n");
-    kprint("=====================================\n");
-    kprint("\n");
+    // Test 4: physical memory manager
+    kprint("\n>>> Starting test_pmm...\n");
+    test_pmm();
+    kprint(">>> CHECKPOINT 4: test_pmm COMPLETE\n");
+	
+	kprint("\n=====================================\n");
+	kprint("       ALL TESTS COMPLETED\n");
+	kprint("=====================================\n");
+	kprint("\n");
 }

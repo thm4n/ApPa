@@ -1,9 +1,11 @@
 #include "../drivers/screen.h"
 #include "../drivers/serial.h"
+#include "gdt.h"
 #include "idt.h"
 #include "pic.h"
 #include "pit.h"
 #include "timer.h"
+#include "pmm.h"
 #include "../drivers/keyboard.h"
 #include "kmalloc.h"
 #include "klog.h"
@@ -19,7 +21,12 @@ void main() {
 	// Clear screen and print welcome message
 	clear_screen();
 	kprint("ApPa Kernel v0.1\n");
-	kprint("Initializing interrupt system...\n");
+	kprint("Initializing system...\n");
+
+	// Phase 0: Set up Global Descriptor Table (GDT)
+	// Replace bootloader's temporary GDT with kernel's permanent GDT
+	gdt_init();
+	kprint("  [OK] GDT initialized\n");
 
 	// Phase 1: Set up Interrupt Descriptor Table (IDT)
 	// This configures the CPU's interrupt handling mechanism
@@ -48,6 +55,11 @@ void main() {
 	kmalloc_init();
 	kprint("  [OK] Kernel heap initialized\n");
 
+	// Phase 4.25: Initialize physical memory manager
+	// Sets up bitmap allocator for 4KB physical page frames
+	pmm_init();
+	kprint("  [OK] Physical memory manager initialized\n");
+
 	// Phase 4.5: Initialize kernel logging system
 	// Sets up circular buffer for persistent kernel logs
 	//klog_init();  // DISABLED FOR DEBUGGING
@@ -70,6 +82,9 @@ void main() {
 	// respond to hardware interrupts
 	__asm__ volatile("sti");
 	kprint("  [OK] Interrupts enabled\n\n");
+	
+	// Run unit tests before entering shell
+	run_all_tests();
 	
 	kprint("=== ApPa OS Ready ===\n");
 	kprint("Timer ticking in top-right corner (0-9 = IRQ0 working)\n");
