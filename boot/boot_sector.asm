@@ -17,41 +17,34 @@
 	call print
 	call print_nl
 
-	call load_kernel
-	call switch_to_pm
-	jmp $
+	call load_stage2
+	
+	; Jump to stage2 which will load kernel and switch to PM
+	jmp 0x9000
 
 %include "boot/print.asm"
 %include "boot/print_hex.asm"
 %include "boot/disk_load.asm"
-%include "boot/print_32pm.asm"
-%include "boot/32bit-gdt.asm"
-%include "boot/switch_32pm.asm"
 
 [bits 16]
-load_kernel:
-	mov bx, MSG_LOAD_KERNEL
+load_stage2:
+	mov bx, MSG_LOAD_STAGE2
 	call print
 	call print_nl
 
-	mov bx, KERNEL_OFFSET
-KERNEL_SECTORS_PATCH:          ; Label for makefile to find offset
-	mov dh, 0                  ; PATCHED BY MAKEFILE - do not change manually
+	; Load stage 2 bootloader (4 sectors at 0x9000)
+	mov bx, 0x9000            ; Load stage2 above kernel to avoid overwrite
+	mov dh, 4                 ; Load 4 sectors (2KB for stage2)
 	mov dl, [BOOT_DRIVE]
 	call disk_load
+	
+	; DL already contains boot drive, stage2 will read it
+	
 	ret
 
-[bits 32]
-BEGIN_PM:
-	mov ebx, MSG_PROT_MODE
-	call print_string_pm
-	call KERNEL_OFFSET
-	jmp $
-
 BOOT_DRIVE: db 0
-MSG_REAL_MODE: db "STARTED IN READ MODE", 0
-MSG_PROT_MODE: db "START PROTECTED MODE", 0
-MSG_LOAD_KERNEL: db "LOADING KERNEL INTO MEMORY", 0
+MSG_REAL_MODE: db "STARTED IN REAL MODE", 0
+MSG_LOAD_STAGE2: db "LOADING STAGE 2", 0
 
 times 510 - ($-$$) db 0
 dw 0xaa55
