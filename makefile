@@ -1,6 +1,6 @@
 # $@ = target file
-# $< = first dependcy
-# $^ = all dependecies
+# $< = first dependency
+# $^ = all dependencies
 
 # Disable built-in implicit rules
 MAKEFLAGS += --no-builtin-rules
@@ -53,120 +53,149 @@ CCFLAGS = -g -fno-stack-protector -march=i686
 LDFLAGS = -g
 SMFLAGS = -D KERNEL_OFFSET=$(KERNEL_OFFSET) -D STACK_BASE=$(STACK_BASE) -D REAL_MODE_STACK=$(REAL_MODE_STACK)
 
-# Debug: Print variables at parse time
-$(info ========== MAKEFILE DEBUG INFO ==========)
-$(info C_SOURCES = $(C_SOURCES))
-$(info HEADERS   = $(HEADERS))
-$(info OBJ       = $(OBJ))
-$(info KERNEL_ASM_OBJ = $(KERNEL_ASM_OBJ))
-$(info CC        = $(CC))
-$(info LD        = $(LD))
-$(info CCFLAGS   = $(CCFLAGS))
-$(info LDFLAGS   = $(LDFLAGS))
-$(info ==========================================)
+# ========== Output Formatting ==========
+# V=1  on the command line enables verbose mode (shows raw commands)
+V ?= 0
 
-# Default target: build the bootable image
+# ANSI color codes
+CLR_RST  = \033[0m
+CLR_BLD  = \033[1m
+CLR_RED  = \033[1;31m
+CLR_GRN  = \033[1;32m
+CLR_YLW  = \033[1;33m
+CLR_BLU  = \033[1;34m
+CLR_CYN  = \033[1;36m
+CLR_DIM  = \033[0;37m
+
+# Pretty-print helpers: tag in color, path dimmed
+# Usage: $(call log,TAG,message)
+define log
+	@printf "  $(CLR_CYN)%-8s$(CLR_RST) %s\n" "[$(1)]" "$(2)"
+endef
+
+# Conditional command echo: silent by default, verbose with V=1
+ifeq ($(V),1)
+  Q =
+  QLOG = @true
+else
+  Q = @
+  QLOG = @
+endif
+
+# Count sources for the summary
+N_C_SRC   := $(words $(C_SOURCES))
+N_ASM_SRC := $(words $(KERNEL_ASM_SOURCES))
+
+# =======================================
+
 # Default target
 all: build
 
 # Build only (no QEMU)
-build: $(BIN_DIR)/image.bin
+build: _build_banner $(BIN_DIR)/image.bin _build_done
+
+# Internal: print banner before build
+_build_banner:
+	@printf "\n$(CLR_BLD)  ApPa OS$(CLR_RST)$(CLR_DIM)  ──  i686 bare-metal kernel$(CLR_RST)\n"
+	@printf "$(CLR_DIM)  ─────────────────────────────────────────$(CLR_RST)\n"
+ifeq ($(V),1)
+	@printf "  $(CLR_DIM)CC      = $(CC)$(CLR_RST)\n"
+	@printf "  $(CLR_DIM)LD      = $(LD)$(CLR_RST)\n"
+	@printf "  $(CLR_DIM)CCFLAGS = $(CCFLAGS)$(CLR_RST)\n"
+	@printf "  $(CLR_DIM)Sources : $(N_C_SRC) C, $(N_ASM_SRC) ASM$(CLR_RST)\n"
+	@printf "$(CLR_DIM)  ─────────────────────────────────────────$(CLR_RST)\n"
+endif
+
+# Internal: print summary after successful build
+_build_done: $(BIN_DIR)/image.bin
+	@KSIZE=$$(stat -c%s $(BIN_DIR)/kernel.bin 2>/dev/null || echo 0); \
+	ISIZE=$$(stat -c%s $(BIN_DIR)/image.bin 2>/dev/null || echo 0); \
+	printf "$(CLR_DIM)  ─────────────────────────────────────────$(CLR_RST)\n"; \
+	printf "  $(CLR_GRN)%-8s$(CLR_RST) kernel %s bytes  |  image %s bytes\n" "[DONE]" "$$KSIZE" "$$ISIZE"; \
+	printf "  $(CLR_DIM)%-8s $(N_C_SRC) C + $(N_ASM_SRC) ASM sources compiled$(CLR_RST)\n" ""; \
+	printf "\n"
 
 # Ensure bin directory exists
 $(BIN_DIR):
 	@mkdir -p $(BIN_DIR)
 
 check:
-	@echo "[DEBUG] check: Listing C sources"
-	echo ${C_SOURCES}
+	@printf "  $(CLR_CYN)%-8s$(CLR_RST) %s\n" "[INFO]" "C sources:"
+	@echo ${C_SOURCES} | tr ' ' '\n' | sed 's/^/           /'
 
 # Stage2 patch offset (location of sectors_remaining immediate value in stage2.asm)
 # Use: nasm boot/stage2.asm -o /tmp/s2.bin -l /tmp/s2.lst && grep -A1 KERNEL_SECTORS_STAGE2_PATCH /tmp/s2.lst
 STAGE2_PATCH_OFFSET = 0x3F
 
 $(BIN_DIR)/stage2.bin: boot/stage2.asm | $(BIN_DIR)
-	@echo "[DEBUG] Assembling stage2 bootloader: $< -> $@"
-	nasm -D KERNEL_OFFSET=$(KERNEL_OFFSET) -D STACK_BASE=$(STACK_BASE) boot/stage2.asm -f bin -o $@
-	@echo "[DEBUG] Created $@ successfully"
+	$(call log,ASM,$< -> $@)
+	$(Q)nasm -D KERNEL_OFFSET=$(KERNEL_OFFSET) -D STACK_BASE=$(STACK_BASE) boot/stage2.asm -f bin -o $@
 
 $(BIN_DIR)/image.bin: $(BIN_DIR)/boot_sector.bin $(BIN_DIR)/stage2.bin $(BIN_DIR)/kernel.bin | $(BIN_DIR)
-	@echo "[DEBUG] Building two-stage bootloader image: $@"
-	@# Calculate required sectors for kernel (rounded up)
+	$(call log,IMG,Assembling disk image)
 	@KERNEL_SIZE=$$(stat -c%s $(BIN_DIR)/kernel.bin); \
 	SECTORS=$$(( ($$KERNEL_SIZE + 511) / 512 )); \
-	echo "[DEBUG] Kernel size: $$KERNEL_SIZE bytes, requires $$SECTORS sectors"; \
+	printf "  $(CLR_DIM)%-8s kernel: $$KERNEL_SIZE bytes  ($$SECTORS sectors)$(CLR_RST)\n" ""; \
 	python3 -c "import sys; sys.stdout.buffer.write(bytes([$$SECTORS]))" | dd of=$(BIN_DIR)/stage2.bin bs=1 seek=$$(($(STAGE2_PATCH_OFFSET))) conv=notrunc status=none; \
-	echo "[DEBUG] Patched stage2 to load $$SECTORS kernel sectors"; \
 	cat $(BIN_DIR)/boot_sector.bin $(BIN_DIR)/stage2.bin $(BIN_DIR)/kernel.bin > $@; \
 	IMAGE_SIZE=$$((512 + 2048 + $$SECTORS * 512)); \
 	dd if=/dev/zero of=$@ bs=1 count=0 seek=$$IMAGE_SIZE 2>/dev/null; \
-	echo "[DEBUG] Created $@ successfully ($$IMAGE_SIZE bytes: 512B boot + 2KB stage2 + $$KERNEL_SIZE kernel)"
+	printf "  $(CLR_DIM)%-8s image:  $$IMAGE_SIZE bytes  (boot 512 + stage2 2K + kernel $$KERNEL_SIZE)$(CLR_RST)\n" ""
+
 $(BIN_DIR)/kernel.bin: boot/kernel_entry.o ${OBJ} ${KERNEL_ASM_OBJ} | $(BIN_DIR)
-	@echo "[DEBUG] Building target: $@"
-	@echo "[DEBUG] Linking objects: $^"
-	@echo "[DEBUG] Command: ${LD} ${LDFLAGS} -o $@ -Ttext 0x1000 $^ --oformat binary"
-	${LD} ${LDFLAGS} -o $@ -Ttext 0x1000 $^ --oformat binary
-	@echo "[DEBUG] Created $@ successfully"
+	$(call log,LD,kernel.bin  ($(words $^) objects))
+	$(Q)${LD} ${LDFLAGS} -o $@ -Ttext 0x1000 $^ --oformat binary
 
 $(BIN_DIR)/kernel.elf: boot/kernel_entry.o ${OBJ} ${KERNEL_ASM_OBJ} | $(BIN_DIR)
-	@echo "[DEBUG] Building target: $@"
-	@echo "[DEBUG] Linking objects: $^"
-	@echo "[DEBUG] Command: ${LD} ${LDFLAGS} -o $@ -Ttext 0x1000 $^"
-	${LD} ${LDFLAGS} -o $@ -Ttext 0x1000 $^
-	@echo "[DEBUG] Created $@ successfully"
+	$(call log,LD,kernel.elf  ($(words $^) objects))
+	$(Q)${LD} ${LDFLAGS} -o $@ -Ttext 0x1000 $^
 
 # Run QEMU with graphical display window
 run-graphics: $(BIN_DIR)/image.bin
-	@echo "[DEBUG] Running QEMU (graphics): $<"
-	qemu-system-i386 -s -drive file=$<,format=raw
+	$(call log,QEMU,graphics mode)
+	@qemu-system-i386 -s -drive file=$<,format=raw
 
 # Run QEMU with curses display (terminal-based VGA with PS/2 keyboard)
 run-term: $(BIN_DIR)/image.bin
-	@echo "[DEBUG] Running QEMU (terminal curses): $<"
-	@echo "[INFO] Press ESC then 2 for QEMU monitor, Ctrl+A then X to exit"
-	qemu-system-i386 -s -drive file=$<,format=raw -display curses
+	$(call log,QEMU,terminal curses mode)
+	@printf "  $(CLR_DIM)%-8s ESC+2 for monitor | Ctrl+A X to exit$(CLR_RST)\n" ""
+	@qemu-system-i386 -s -drive file=$<,format=raw -display curses
 
 # Run QEMU with serial output tee'd to stdout (no keyboard input)
 run-log: $(BIN_DIR)/image.bin
-	@echo "[DEBUG] Running QEMU (logging): $<"
-	@echo "[INFO] Output: stdout + last_run.log | Ctrl+A then X to exit"
+	$(call log,QEMU,serial logging mode)
+	@printf "  $(CLR_DIM)%-8s Output: stdout + last_run.log | Ctrl+A X to exit$(CLR_RST)\n" ""
 	@rm -f last_run.log
-	qemu-system-i386 -s -drive file=$<,format=raw -serial mon:stdio -nographic 2>&1 | tee last_run.log
+	@qemu-system-i386 -s -drive file=$<,format=raw -serial mon:stdio -nographic 2>&1 | tee last_run.log
 
 # Aliases for convenience
 run: run-graphics
 
 debug: $(BIN_DIR)/image.bin $(BIN_DIR)/kernel.elf
-	@echo "[DEBUG] Starting debug session"
-	@echo "[DEBUG] Launching QEMU in background with image: $<"
-	qemu-system-i386 -s -drive file=$<,format=raw &
-	@echo "[DEBUG] Connecting GDB to localhost:1234"
-	${GDB} -ex "target remote localhost:1234" -ex "symbol-file $(BIN_DIR)/kernel.elf"
+	$(call log,DEBUG,Launching QEMU + GDB session)
+	@qemu-system-i386 -s -drive file=$<,format=raw &
+	@printf "  $(CLR_DIM)%-8s Connecting GDB to localhost:1234$(CLR_RST)\n" ""
+	@${GDB} -ex "target remote localhost:1234" -ex "symbol-file $(BIN_DIR)/kernel.elf"
 
 %.o: %.c ${HEADERS}
-	@echo "[DEBUG] Compiling C file: $< -> $@"
-	@echo "[DEBUG] Command: ${CC} ${CCFLAGS} -ffreestanding -c $< -o $@"
-	${CC} ${CCFLAGS} -ffreestanding -c $< -o $@
-	@echo "[DEBUG] Compiled $@ successfully"
+	$(call log,CC,$<)
+	$(Q)${CC} ${CCFLAGS} -ffreestanding -c $< -o $@
 
 %.o: %.asm
-	@echo "[DEBUG] Assembling ASM file: $< -> $@"
-	@echo "[DEBUG] Command: nasm ${SMFLAGS} $< -f elf32 -o $@"
-	nasm ${SMFLAGS} $< -f elf32 -o $@
-	@echo "[DEBUG] Assembled $@ successfully"
+	$(call log,ASM,$<)
+	$(Q)nasm ${SMFLAGS} $< -f elf32 -o $@
 
 $(BIN_DIR)/%.bin: boot/%.asm | $(BIN_DIR)
-	@echo "[DEBUG] Assembling ASM to binary: $< -> $@"
-	@echo "[DEBUG] Command: nasm ${SMFLAGS} $< -f bin -o $@"
-	nasm ${SMFLAGS} $< -f bin -o $@
-	@echo "[DEBUG] Created $@ successfully"
+	$(call log,ASM,$< -> $@)
+	$(Q)nasm ${SMFLAGS} $< -f bin -o $@
 
 clean:
-	@echo "[DEBUG] Cleaning build artifacts..."
-	@echo "[DEBUG] Removing: $(BIN_DIR)/*"
-	rm -rf $(BIN_DIR)/*
-	@echo "[DEBUG] Removing: $(wildcard *.o */*.o */*/*.o)"
-	rm -f $(wildcard *.o */*.o */*/*.o)
-	@echo "[DEBUG] Clean complete"
+	@printf "\n$(CLR_BLD)  ApPa OS$(CLR_RST)$(CLR_DIM)  ──  clean$(CLR_RST)\n"
+	@printf "$(CLR_DIM)  ─────────────────────────────────────────$(CLR_RST)\n"
+	$(call log,CLEAN,bin/*)
+	@rm -rf $(BIN_DIR)/*
+	$(call log,CLEAN,*.o)
+	@rm -f $(wildcard *.o */*.o */*/*.o)
+	@printf "  $(CLR_GRN)%-8s$(CLR_RST) All build artifacts removed\n\n" "[DONE]"
 
-.PHONY: all build run run-graphics run-term run-log debug clean check
+.PHONY: all build run run-graphics run-term run-log debug clean check _build_banner _build_done
