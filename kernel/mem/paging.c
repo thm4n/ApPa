@@ -8,9 +8,9 @@
 
 #include "paging.h"
 #include "pmm.h"
-#include "isr.h"
-#include "../drivers/screen.h"
-#include "../libc/string.h"
+#include "../arch/isr.h"
+#include "../../drivers/screen.h"
+#include "../../libc/string.h"
 
 // ─── Globals ───────────────────────────────────────────────────────────────
 

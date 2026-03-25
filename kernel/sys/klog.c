@@ -1,8 +1,8 @@
 #include "klog.h"
-#include "../libc/stdio.h"
-#include "../libc/stdarg.h"
-#include "../libc/string.h"
-#include "../drivers/screen.h"
+#include "../../libc/stdio.h"
+#include "../../libc/stdarg.h"
+#include "../../libc/string.h"
+#include "../../drivers/screen.h"
 
 // Circular buffer for log entries
 static klog_entry_t log_buffer[KLOG_BUFFER_SIZE];

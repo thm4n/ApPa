@@ -6,7 +6,7 @@
  */
 
 #include "pit.h"
-#include "../drivers/ports.h"
+#include "../../drivers/ports.h"
 
 #define PIT_CHANNEL0_DATA  0x40
 #define PIT_COMMAND        0x43

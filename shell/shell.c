@@ -3,10 +3,10 @@
 #include "../drivers/ata.h"
 #include "../libc/string.h"
 #include "../fs/simplefs.h"
-#include "kmalloc.h"
-#include "pmm.h"
-#include "paging.h"
-#include "timer.h"
+#include "../kernel/mem/kmalloc.h"
+#include "../kernel/mem/pmm.h"
+#include "../kernel/mem/paging.h"
+#include "../kernel/sys/timer.h"
 
 /*
  * ApPa Simple Command Shell

@@ -1,7 +1,7 @@
 #ifndef KLOG_H
 #define KLOG_H
 
-#include "../libc/stdint.h"
+#include "../../libc/stdint.h"
 
 // Log buffer size (number of messages)
 #define KLOG_BUFFER_SIZE 256

@@ -1,5 +1,5 @@
 #include "kmalloc.h"
-#include "../drivers/screen.h"
+#include "../../drivers/screen.h"
 
 void kmalloc_init() {
     block_header_t* initial_block = (block_header_t*)HEAP_START;

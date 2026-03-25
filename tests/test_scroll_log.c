@@ -1,7 +1,7 @@
 #include "../libc/stdio.h"
 #include "../libc/stddef.h"
 #include "../drivers/screen.h"
-#include "../kernel/klog.h"
+#include "../kernel/sys/klog.h"
 #include "test_scroll_log.h"
 
 void test_klog() {

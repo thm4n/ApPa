@@ -1,8 +1,8 @@
 #ifndef PAGING_H
 #define PAGING_H
 
-#include "../libc/stdint.h"
-#include "isr.h"
+#include "../../libc/stdint.h"
+#include "../arch/isr.h"
 
 /**
  * Paging / Virtual Memory Manager

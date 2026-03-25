@@ -8,8 +8,8 @@
 
 #include "test_paging.h"
 #include "../drivers/screen.h"
-#include "../kernel/paging.h"
-#include "../kernel/pmm.h"
+#include "../kernel/mem/paging.h"
+#include "../kernel/mem/pmm.h"
 
 void test_paging(void) {
     kprint("=== Testing Paging Subsystem ===\n");

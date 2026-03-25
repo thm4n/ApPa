@@ -9,7 +9,7 @@
 
 #include "ata.h"
 #include "ports.h"
-#include "../drivers/screen.h"
+#include "screen.h"
 #include "../libc/string.h"
 
 /* Static drive info populated by ata_init / ata_identify */

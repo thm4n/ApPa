@@ -1,8 +1,8 @@
 #ifndef KMALLOC_H
 #define KMALLOC_H
 
-#include "../libc/stdint.h"
-#include "../libc/stddef.h"
+#include "../../libc/stdint.h"
+#include "../../libc/stddef.h"
 
 // Heap memory region (1MB - 2MB)
 #define HEAP_START  0x100000  // 1MB

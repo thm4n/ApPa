@@ -1,7 +1,7 @@
 #ifndef TIMER_H
 #define TIMER_H
 
-#include "../libc/stdint.h"
+#include "../../libc/stdint.h"
 
 /**
  * timer_init - Initialize the timer subsystem

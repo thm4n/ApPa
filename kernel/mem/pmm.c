@@ -6,8 +6,8 @@
  */
 
 #include "pmm.h"
-#include "../drivers/screen.h"
-#include "../libc/string.h"
+#include "../../drivers/screen.h"
+#include "../../libc/string.h"
 #include "kmalloc.h"
 
 // PMM state structure

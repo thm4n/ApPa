@@ -1,5 +1,5 @@
 #include "isr.h"
-#include "../drivers/screen.h"
+#include "../../drivers/screen.h"
 
 // Array of interrupt handlers (shared by ISR and IRQ)
 isr_handler_t interrupt_handlers[256];

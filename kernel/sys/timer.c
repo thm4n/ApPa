@@ -6,8 +6,8 @@
  */
 
 #include "timer.h"
-#include "isr.h"
-#include "../libc/string.h"
+#include "../arch/isr.h"
+#include "../../libc/string.h"
 
 // Timer configuration
 #define TIMER_FREQUENCY 100  // Hz (ticks per second)

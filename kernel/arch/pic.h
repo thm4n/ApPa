@@ -1,7 +1,7 @@
 #ifndef PIC_H
 #define PIC_H
 
-#include "../libc/stdint.h"
+#include "../../libc/stdint.h"
 
 /*
  * 8259 Programmable Interrupt Controller (PIC) Driver

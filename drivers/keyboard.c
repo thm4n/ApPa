@@ -1,10 +1,10 @@
 #include "keyboard.h"
 #include "screen.h"
 #include "ports.h"
-#include "../kernel/isr.h"
-#include "../kernel/klog.h"
-#include "../kernel/pic.h"
-#include "../kernel/shell.h"
+#include "../kernel/arch/isr.h"
+#include "../kernel/sys/klog.h"
+#include "../kernel/arch/pic.h"
+#include "../shell/shell.h"
 
 /*
  * PS/2 Keyboard Driver

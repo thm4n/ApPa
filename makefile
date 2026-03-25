@@ -6,12 +6,12 @@
 MAKEFLAGS += --no-builtin-rules
 .SUFFIXES:
 
-C_SOURCES = $(wildcard *.c */*.c)
-HEADERS = $(wildcard *.h */*.h)
+C_SOURCES = $(wildcard *.c */*.c */*/*.c)
+HEADERS = $(wildcard *.h */*.h */*/*.h)
 OBJ = ${C_SOURCES:.c=.o}
 
 # Kernel assembly sources (not boot sector)
-KERNEL_ASM_SOURCES = $(wildcard kernel/*.asm)
+KERNEL_ASM_SOURCES = $(wildcard kernel/arch/*.asm)
 KERNEL_ASM_OBJ = ${KERNEL_ASM_SOURCES:.asm=.o}
 
 BIN_DIR = bin
@@ -159,8 +159,8 @@ clean:
 	@echo "[DEBUG] Cleaning build artifacts..."
 	@echo "[DEBUG] Removing: $(BIN_DIR)/*"
 	rm -rf $(BIN_DIR)/*
-	@echo "[DEBUG] Removing: $(wildcard *.o */*.o)"
-	rm -f $(wildcard *.o */*.o)
+	@echo "[DEBUG] Removing: $(wildcard *.o */*.o */*/*.o)"
+	rm -f $(wildcard *.o */*.o */*/*.o)
 	@echo "[DEBUG] Clean complete"
 
 .PHONY: all build run run-graphics run-term debug clean check

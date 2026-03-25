@@ -1,7 +1,7 @@
 #ifndef GDT_H
 #define GDT_H
 
-#include "../libc/stdint.h"
+#include "../../libc/stdint.h"
 
 // GDT entry structure
 struct gdt_entry {

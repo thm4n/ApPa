@@ -6,7 +6,7 @@
  */
 
 #include "ramdisk.h"
-#include "../kernel/pmm.h"
+#include "../kernel/mem/pmm.h"
 #include "../libc/string.h"
 #include "../drivers/screen.h"
 
