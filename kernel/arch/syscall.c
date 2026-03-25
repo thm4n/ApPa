@@ -15,6 +15,7 @@
 #include "../task/task.h"
 #include "../task/sched.h"
 #include "../sys/timer.h"
+#include "../sys/klog.h"
 #include "../mem/paging.h"
 #include "../../drivers/screen.h"
 #include "../../drivers/keyboard.h"
@@ -109,11 +110,11 @@ void syscall_init(void) {
     register_interrupt_handler(13, gpf_handler);
 
     /*
-     * Mark the identity-mapped 0-16 MB region as user-accessible so
-     * Ring 3 code can execute kernel-linked functions.  True memory
-     * isolation requires per-process page directories (future phase).
+     * Phase 15: Per-process page directories now handle user-accessible
+     * mappings.  paging_enable_user_access() is no longer called here;
+     * each user task's clone directory marks specific code and stack
+     * pages as PAGE_USER instead of opening the entire 0-16 MB range.
      */
-    paging_enable_user_access();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -252,12 +253,18 @@ static void gpf_handler(registers_t *regs) {
         kprint_hex(regs->err_code);
         kprint(" -- killed.\n");
 
+        klog_error("GPF eip=0x%x err=0x%x task='%s' [user] -> killed",
+                   regs->eip, regs->err_code,
+                   cur ? cur->name : "?");
+
         task_exit();
         /* Never reached */
     }
 
     /* Kernel-mode #GP — fatal, print and halt */
     __asm__ volatile("cli");
+    klog_error("GPF eip=0x%x cs=0x%x err=0x%x [kernel] -> halted",
+               regs->eip, regs->cs, regs->err_code);
     kprint("\n========== KERNEL GPF ==========\n");
     kprint("EIP: ");
     kprint_hex(regs->eip);

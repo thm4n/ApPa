@@ -32,12 +32,12 @@ typedef int (*syscall_fn_t)(registers_t *);
 
 /* ─── User-Space Memory Boundaries ──────────────────────────────────────── */
 
-/* During Phase 13 with identity mapping, user code shares the kernel's
- * address space.  User stacks are PMM-allocated in the 0x200000-0xF00000
- * range.  Once per-process page directories are implemented (future),
- * these boundaries will tighten to a true user-only region. */
+/* Phase 15: User code is identity-mapped (in the kernel binary below 4 MB)
+ * and user stacks live at a high virtual address (0xBFFFF000).
+ * The actual access control is enforced by per-process page tables;
+ * this range check is a quick sanity filter. */
 #define USER_SPACE_START  0x00001000   /* Above null page               */
-#define USER_SPACE_END    0x01000000   /* Top of identity-mapped 16 MB  */
+#define USER_SPACE_END    0xC0000000   /* Top of user virtual space      */
 
 /* ─── API ───────────────────────────────────────────────────────────────── */
 

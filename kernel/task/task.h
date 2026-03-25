@@ -46,6 +46,9 @@ typedef struct task {
     uint32_t        user_stack_top;         // Top of user stack (used in iret frame)
     uint8_t         is_user;                // 1 = Ring 3 task, 0 = Ring 0 task
 
+    uint32_t        cr3;                    // Physical address of per-process page directory (0 = kernel)
+    void            *page_dir;              // Virtual pointer to page directory (NULL for kernel tasks)
+
     struct task     *next;                  // Next task in the ready / free list
 } task_t;
 

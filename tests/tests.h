@@ -11,6 +11,7 @@
 #include "test_fs.h"
 #include "test_multitask.h"
 #include "test_userspace.h"
+#include "test_addrspace.h"
 
 // Master function to run all tests
 void run_all_tests();

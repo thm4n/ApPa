@@ -158,9 +158,14 @@ void task_reap(void) {
             // Free the PMM page used as the kernel stack
             free_page((uint32_t)task_pool[i].kernel_stack);
 
-            // Free user stack if this was a Ring 3 task
-            if (task_pool[i].user_stack != 0) {
-                // Unmap the user-accessible page
+            // Free per-process page directory (frees user stack page,
+            // user page tables, and the directory page itself).
+            // The user stack physical page is freed inside
+            // paging_free_directory() when it walks PDE 4+.
+            if (task_pool[i].page_dir != 0) {
+                paging_free_directory((page_directory_t *)task_pool[i].page_dir);
+            } else if (task_pool[i].user_stack != 0) {
+                // Legacy path (no per-process directory): free user stack manually
                 paging_unmap_page((uint32_t)task_pool[i].user_stack);
                 free_page((uint32_t)task_pool[i].user_stack);
             }
@@ -178,8 +183,21 @@ void task_reap(void) {
 
 extern void enter_usermode(void);
 
+/* ─── Libc syscall wrappers whose pages need PAGE_USER in clones ───────── */
+
+extern void sys_exit(void);
+extern int  sys_write(const char *buf, int len);
+extern int  sys_read(char *buf, int max);
+extern void sys_yield(void);
+extern int  sys_getpid(void);
+extern void sys_sleep(int ms);
+
 /**
  * task_create_user - Spawn a new Ring 3 (user-mode) task
+ *
+ * Phase 15: Creates a private page directory for the new task,
+ * maps user code pages with PAGE_USER, and maps a user stack at
+ * a fixed high virtual address.
  */
 task_t* task_create_user(task_entry_t entry, const char *name) {
     task_t *t = alloc_tcb();
@@ -200,19 +218,68 @@ task_t* task_create_user(task_entry_t entry, const char *name) {
     t->kernel_stack = (uint32_t*)kstack_phys;
     t->esp0 = kstack_phys + TASK_KERNEL_STACK_SIZE;   /* Top of kernel stack */
 
-    /* ── Allocate user stack (4 KB, user-accessible) ───────────────── */
-    uint32_t ustack_phys = alloc_page();
-    if (!ustack_phys) {
+    /* ── Create per-process page directory ─────────────────────────── */
+    uint32_t clone_phys = 0;
+    page_directory_t *clone_dir = paging_clone_directory(&clone_phys);
+    if (!clone_dir) {
         free_page(kstack_phys);
         memset(t, 0, sizeof(task_t));
         return 0;
     }
-    t->user_stack = (uint32_t*)ustack_phys;
+    t->page_dir = clone_dir;
+    t->cr3      = clone_phys;
 
-    /* Map the user stack page with User/Supervisor=1 so Ring 3 can use it.
-     * Under identity mapping physical == virtual. */
-    paging_map_user(ustack_phys, ustack_phys, 1 /* writable */);
-    t->user_stack_top = ustack_phys + TASK_KERNEL_STACK_SIZE;  /* Same 4 KB */
+    /* ── Map user code pages in the clone (PAGE_USER) ──────────────── *
+     *
+     * User entry functions and libc syscall wrappers are compiled into
+     * the kernel binary (identity-mapped below 4 MB).  We mark the
+     * specific pages containing these functions as PAGE_USER in the
+     * cloned PDE-0 page table so Ring 3 can execute them.
+     *
+     * Identity mapping: virtual == physical for these pages.           */
+
+    /* Helper: mark a function's page(s) as user-accessible */
+    #define MAP_USER_PAGE(func_addr) do {                               \
+        uint32_t _pg = (uint32_t)(func_addr) & PAGE_FRAME_MASK;        \
+        paging_map_page_in(clone_dir, _pg, _pg,                         \
+                           PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER);   \
+    } while (0)
+
+    /* Map the user entry function page */
+    MAP_USER_PAGE(entry);
+    /* Also map the next page in case the function spans a page boundary */
+    MAP_USER_PAGE((uint32_t)entry + 0x1000);
+
+    /* Map libc syscall wrapper pages */
+    MAP_USER_PAGE(sys_exit);
+    MAP_USER_PAGE(sys_write);
+    MAP_USER_PAGE(sys_read);
+    MAP_USER_PAGE(sys_yield);
+    MAP_USER_PAGE(sys_getpid);
+    MAP_USER_PAGE(sys_sleep);
+
+    #undef MAP_USER_PAGE
+
+    /* ── Allocate & map user stack at a high virtual address ───────── *
+     * Physical page is allocated from the PMM, then mapped at
+     * USER_STACK_VIRT in the clone directory.  This gives each
+     * process a private stack at the same virtual address.            */
+    uint32_t ustack_phys = alloc_page();
+    if (!ustack_phys) {
+        paging_free_directory(clone_dir);
+        free_page(kstack_phys);
+        memset(t, 0, sizeof(task_t));
+        return 0;
+    }
+    /* Zero the user stack page */
+    memset((void *)ustack_phys, 0, TASK_KERNEL_STACK_SIZE);
+
+    t->user_stack     = (uint32_t *)ustack_phys;
+    t->user_stack_top = USER_STACK_TOP;  /* ESP starts at top of page */
+
+    /* Map the user stack page in the clone directory */
+    paging_map_page_in(clone_dir, USER_STACK_VIRT, ustack_phys,
+                       PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER);
 
     /* ── Build iret frame on the kernel stack ──────────────────────── *
      *

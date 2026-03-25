@@ -26,6 +26,16 @@
 // Mask to extract the 20-bit frame address from a PDE/PTE
 #define PAGE_FRAME_MASK     0xFFFFF000
 
+// ─── Per-Process Virtual Address Layout ────────────────────────────────────
+
+// User code is still linked in the kernel binary (identity-mapped below 4 MB).
+// The user stack gets a fixed high virtual address per process.
+#define USER_STACK_VIRT     0xBFFFF000  // Virtual address for the user stack page
+#define USER_STACK_TOP      0xC0000000  // ESP starts here (stack grows down)
+
+// Number of kernel PDEs (0-3, covering 0-16 MB) that are shared/cloned
+#define KERNEL_PDE_COUNT    4
+
 // ─── Virtual Address Decomposition ─────────────────────────────────────────
 
 // Extract PD index (bits 31-22) from virtual address
@@ -147,5 +157,52 @@ void paging_map_user(uint32_t virt, uint32_t phys, int rw);
  * requires per-process page directories (future phase).
  */
 void paging_enable_user_access(void);
+
+// ─── Per-Process Address Space API (Phase 15) ──────────────────────────────
+
+/**
+ * paging_clone_directory - Create a per-process page directory
+ * @out_phys: Receives the physical address of the new page directory
+ *
+ * Allocates a new page directory, clones the kernel's PDE 0 page table
+ * (private copy so per-process PAGE_USER bits can be set on user code
+ * pages), shares PDE 1-(KERNEL_PDE_COUNT-1) verbatim (supervisor-only),
+ * and clears all entries above the kernel range.
+ *
+ * Returns: Virtual pointer to the new page directory, or NULL on failure.
+ */
+page_directory_t* paging_clone_directory(uint32_t *out_phys);
+
+/**
+ * paging_map_page_in - Map a page in a specific page directory
+ * @dir:   Target page directory (may differ from the kernel directory)
+ * @virt:  Virtual address (page-aligned)
+ * @phys:  Physical frame address (page-aligned)
+ * @flags: PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER etc.
+ *
+ * If the page table for this virtual region doesn't exist yet in @dir,
+ * one is allocated from the PMM and installed.  Under identity mapping,
+ * the page table physical address is used as a virtual pointer.
+ */
+void paging_map_page_in(page_directory_t *dir, uint32_t virt,
+                        uint32_t phys, uint32_t flags);
+
+/**
+ * paging_free_directory - Free a per-process page directory and all its
+ *                         private user pages and page tables
+ * @dir: Virtual pointer to the page directory
+ *
+ * Walks PDE entries above the shared kernel range, frees every mapped
+ * physical page and page table, and frees the directory page itself.
+ * Also frees the private PDE 0 page table clone (but NOT the physical
+ * frames it maps, since those belong to the kernel identity map).
+ */
+void paging_free_directory(page_directory_t *dir);
+
+/**
+ * paging_get_kernel_cr3 - Return the physical address of the kernel
+ *                         page directory loaded at boot
+ */
+uint32_t paging_get_kernel_cr3(void);
 
 #endif // PAGING_H

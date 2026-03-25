@@ -10,6 +10,7 @@
 #include "../kernel/sys/klog.h"
 #include "../tests/test_multitask.h"
 #include "../tests/test_userspace.h"
+#include "../tests/test_addrspace.h"
 
 /*
  * ApPa Simple Command Shell
@@ -38,6 +39,7 @@ static void cmd_rm(const char* args);
 static void cmd_disk(void);
 static void cmd_tasktest(void);
 static void cmd_usertest(void);
+static void cmd_addrtest(void);
 static void cmd_dmesg(const char* args);
 
 /**
@@ -143,6 +145,8 @@ void shell_execute(const char* cmd) {
 		cmd_tasktest();
 	} else if (strncmp(cmd, "usertest", cmd_len) == 0 && cmd_len == 8) {
 		cmd_usertest();
+	} else if (strncmp(cmd, "addrtest", cmd_len) == 0 && cmd_len == 8) {
+		cmd_addrtest();
 	} else if (strncmp(cmd, "dmesg", cmd_len) == 0 && cmd_len == 5) {
 		cmd_dmesg(args);
 	} else {
@@ -172,6 +176,7 @@ static void cmd_help(void) {
 	kprint("  disk         - Show ATA disk information\n");
 	kprint("  tasktest     - Run multitasking tests\n");
 	kprint("  usertest     - Run Ring 3 userspace tests\n");
+	kprint("  addrtest     - Run per-process address space tests\n");
 	kprint("  dmesg        - Display kernel log buffer\n");
 	kprint("  dmesg save   - Flush kernel log to klog.txt\n");
 	kprint("  color <name> - Change text color\n");
@@ -511,6 +516,15 @@ static void cmd_tasktest(void) {
  */
 static void cmd_usertest(void) {
 	test_userspace();
+}
+
+/**
+ * cmd_addrtest - Run Phase 15 per-process address space tests
+ * Spawns Ring 3 tasks with private page directories and verifies
+ * memory isolation, syscall operation, and cleanup.
+ */
+static void cmd_addrtest(void) {
+	test_addrspace();
 }
 
 /**

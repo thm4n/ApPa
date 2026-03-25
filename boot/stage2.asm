@@ -50,8 +50,10 @@ load_kernel_stage2:
 	call print_rm
 	call print_nl_rm
 	
-	; Load kernel to KERNEL_OFFSET
-	mov word [buffer_ptr], KERNEL_OFFSET
+	; Load kernel via ES:BX segment addressing (supports kernels > 60 KB)
+	; buffer_seg holds the current real-mode segment; BX is always 0.
+	; Physical address = buffer_seg * 16.
+	mov word [buffer_seg], KERNEL_OFFSET / 16
 	
 	; Kernel starts at LBA sector 5 (sector 1 = boot, 2-5 = stage2)
 	; We track position using LBA and convert to CHS for INT 13h
@@ -105,14 +107,19 @@ KERNEL_SECTORS_STAGE2_PATCH:  ; Makefile will patch this location
 	; Save count for bookkeeping
 	mov [read_count], al
 	
-	; Set up INT 13h
-	mov bx, [buffer_ptr]    ; load buffer pointer into BX for INT 13h
-	mov ah, 0x02            ; BIOS read function
+	; Set up INT 13h — use ES:BX segment addressing
+	; ES = buffer_seg (advances each iteration), BX = 0
+	; Must preserve AL (sector count) across ES load
+	push ax                  ; save AL = sector count
+	mov ax, [buffer_seg]
+	mov es, ax
+	pop ax                   ; restore AL = sector count
+	xor bx, bx              ; ES:BX = buffer_seg:0000
+	mov ah, 0x02             ; BIOS read function (AL = count preserved)
 	mov dl, [BOOT_DRIVE]
 	; CH = cylinder (set above)
 	; CL = sector (set above)  
 	; DH = head (set above)
-	; BX = buffer pointer
 	
 	int 0x13
 	jc .disk_error
@@ -122,10 +129,10 @@ KERNEL_SECTORS_STAGE2_PATCH:  ; Makefile will patch this location
 	sub [sectors_remaining], al
 	add [lba_sector], al
 	
-	; Advance buffer pointer (512 bytes per sector)
+	; Advance segment by sectors_read * 32 paragraphs (512 bytes / 16)
 	movzx ax, byte [read_count]
-	shl ax, 9               ; multiply by 512
-	add [buffer_ptr], ax
+	shl ax, 5               ; multiply by 32 (paragraphs per sector)
+	add [buffer_seg], ax
 	
 	jmp .load_loop
 
@@ -224,7 +231,7 @@ BOOT_DRIVE: db 0
 lba_sector: db 0
 sectors_remaining: db 0
 read_count: db 0
-buffer_ptr: dw 0
+buffer_seg: dw 0
 
 MSG_STAGE2: db "Stage 2 Loader", 0
 MSG_LOADING_KERNEL: db "Loading kernel...", 0

@@ -14,6 +14,7 @@
 #include "task.h"
 #include "../arch/tss.h"
 #include "../arch/gdt.h"
+#include "../mem/paging.h"
 #include "../../libc/string.h"
 #include "../../drivers/screen.h"
 
@@ -81,6 +82,17 @@ static void switch_to(task_t *next) {
 
     // Update TSS so interrupts in the new task use its kernel stack
     tss_set_kernel_stack(next->esp0);
+
+    // ── Phase 15: Switch address space if needed ──
+    // User tasks have a per-process page directory (cr3 != 0).
+    // Kernel/idle tasks use cr3 == 0, meaning "kernel directory".
+    {
+        uint32_t next_cr3 = next->cr3 ? next->cr3 : paging_get_kernel_cr3();
+        uint32_t prev_cr3 = prev->cr3 ? prev->cr3 : paging_get_kernel_cr3();
+        if (next_cr3 != prev_cr3) {
+            __asm__ volatile("mov %0, %%cr3" : : "r"(next_cr3) : "memory");
+        }
+    }
 
     // Low-level register swap
     task_switch(&prev->esp, next->esp);

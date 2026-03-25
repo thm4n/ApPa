@@ -9,6 +9,8 @@
 #include "paging.h"
 #include "pmm.h"
 #include "../arch/isr.h"
+#include "../task/task.h"
+#include "../sys/klog.h"
 #include "../../drivers/screen.h"
 #include "../../libc/string.h"
 
@@ -58,11 +60,11 @@ void page_fault_handler(registers_t* regs) {
     int reserved = regs->err_code & 0x8;   // 1 = reserved bit overwritten
     int ifetch   = regs->err_code & 0x10;  // 1 = instruction fetch
 
+    // CR2 and error code are available — build a diagnostic string
+    char hex_buf[12];
+
     kprint("\n!!! PAGE FAULT !!!\n");
     kprint("  Faulting address: 0x");
-
-    // Print faulting address as hex
-    char hex_buf[12];
     uitoa(faulting_addr, hex_buf, 16);
     kprint(hex_buf);
     kprint("\n");
@@ -94,7 +96,24 @@ void page_fault_handler(registers_t* regs) {
     kprint(hex_buf);
     kprint("\n");
 
-    // Halt — no recovery in this phase
+    /* ── Log to klog so dmesg captures it ── */
+    if (user) {
+        task_t *cur = task_get_current();
+        klog_error("PAGE FAULT addr=0x%x eip=0x%x err=0x%x task='%s' [user] -> killed",
+                   faulting_addr, regs->eip, regs->err_code,
+                   cur ? cur->name : "?");
+        kprint("  -> Killing user task '");
+        if (cur) kprint(cur->name);
+        kprint("'\n");
+        task_exit();
+        /* Never reached */
+    }
+
+    /* Kernel-mode fault */
+    klog_error("PAGE FAULT addr=0x%x eip=0x%x err=0x%x [kernel] -> halted",
+               faulting_addr, regs->eip, regs->err_code);
+
+    // Kernel-mode fault — halt (unrecoverable)
     kprint("System halted.\n");
     __asm__ volatile("hlt");
 }
@@ -342,4 +361,151 @@ void paging_status(void) {
     } else {
         kprint("\n");
     }
+}
+
+// ─── Per-Process Address Space (Phase 15) ──────────────────────────────────
+
+/**
+ * paging_clone_directory - Create a per-process page directory
+ *
+ * 1. Allocates a new 4 KB page for the page directory
+ * 2. For PDE 0: allocates a private page table clone (copy of kernel PT 0)
+ *    so user code pages can be selectively marked PAGE_USER per-process
+ *    without affecting the shared kernel mappings
+ * 3. For PDE 1-(KERNEL_PDE_COUNT-1): copies the PDE verbatim (shared
+ *    physical page tables, supervisor-only)
+ * 4. Clears PDE entries above the kernel range (user space)
+ */
+page_directory_t* paging_clone_directory(uint32_t *out_phys) {
+    /* Allocate a fresh page for the page directory */
+    uint32_t dir_phys = alloc_page();
+    if (dir_phys == 0) return 0;
+
+    page_directory_t *dir = (page_directory_t *)dir_phys;
+    memset(dir->entries, 0, sizeof(dir->entries));
+
+    /* ── PDE 0: Private clone of kernel page table 0 ──
+     * We need a private copy because user-code pages within 0-4 MB
+     * must be marked PAGE_USER in this process only. */
+    if (pd_tables[0]) {
+        uint32_t pt0_phys = alloc_page();
+        if (pt0_phys == 0) {
+            free_page(dir_phys);
+            return 0;
+        }
+        page_table_t *pt0_clone = (page_table_t *)pt0_phys;
+        /* Copy all 1024 PTEs from the kernel's page table 0 */
+        memcpy(pt0_clone->entries, pd_tables[0]->entries,
+               sizeof(pt0_clone->entries));
+
+        /* Install PDE 0 — supervisor-only at PDE level for now;
+         * paging_map_page_in() will set PAGE_USER when mapping user pages */
+        dir->entries[0] = pt0_phys | PAGE_PRESENT | PAGE_WRITABLE;
+    }
+
+    /* ── PDE 1 .. (KERNEL_PDE_COUNT-1): Shared kernel page tables ── */
+    for (uint32_t i = 1; i < KERNEL_PDE_COUNT; i++) {
+        dir->entries[i] = kernel_directory->entries[i];
+        /* These remain supervisor-only — Ring 3 cannot touch kernel data */
+    }
+
+    /* ── PDE KERNEL_PDE_COUNT .. 1023: clear (populated per-process) ── */
+    /* Already zeroed by memset above */
+
+    if (out_phys) *out_phys = dir_phys;
+    return dir;
+}
+
+/**
+ * paging_map_page_in - Map a page in a specific page directory
+ *
+ * Works like paging_map_page() but targets @dir instead of the
+ * global kernel_directory.  Under identity mapping physical == virtual,
+ * so we derive the page_table_t* directly from the PDE.
+ */
+void paging_map_page_in(page_directory_t *dir, uint32_t virt,
+                        uint32_t phys, uint32_t flags)
+{
+    uint32_t pd_idx = PAGE_DIR_INDEX(virt);
+    uint32_t pt_idx = PAGE_TABLE_INDEX(virt);
+
+    /* If no page table exists for this PDE slot, allocate one */
+    if (!(dir->entries[pd_idx] & PAGE_PRESENT)) {
+        uint32_t pt_phys = alloc_page();
+        if (pt_phys == 0) {
+            kprint("paging_map_page_in: out of memory for page table\n");
+            return;
+        }
+        page_table_t *pt = (page_table_t *)pt_phys;
+        memset(pt->entries, 0, sizeof(pt->entries));
+
+        dir->entries[pd_idx] = pt_phys | PAGE_PRESENT | PAGE_WRITABLE
+                              | (flags & PAGE_USER);
+    } else if (flags & PAGE_USER) {
+        /* PDE already exists — ensure PAGE_USER is propagated.
+         * x86 checks both PDE and PTE User/Supervisor bits. */
+        dir->entries[pd_idx] |= PAGE_USER;
+    }
+
+    /* Derive the page_table_t* from the PDE (identity mapping) */
+    page_table_t *table = (page_table_t *)(dir->entries[pd_idx] & PAGE_FRAME_MASK);
+
+    /* Set the PTE */
+    table->entries[pt_idx] = (phys & PAGE_FRAME_MASK)
+                            | (flags & 0xFFF)
+                            | PAGE_PRESENT;
+}
+
+/**
+ * paging_free_directory - Free a per-process page directory
+ *
+ * Walks the directory:
+ *   - PDE 0: free the private page table clone (but NOT the physical
+ *     frames, which belong to the kernel identity map)
+ *   - PDE 1 .. (KERNEL_PDE_COUNT-1): skip (shared kernel page tables)
+ *   - PDE KERNEL_PDE_COUNT .. 1023: for each present entry, walk the
+ *     page table and free every mapped physical page, then free the
+ *     page table page itself
+ *   - Finally, free the page directory page
+ */
+void paging_free_directory(page_directory_t *dir) {
+    if (!dir) return;
+
+    /* ── PDE 0: private clone — free only the page table page ── */
+    if (dir->entries[0] & PAGE_PRESENT) {
+        uint32_t pt0_phys = dir->entries[0] & PAGE_FRAME_MASK;
+        /* Do NOT free individual frames — they belong to the kernel */
+        free_page(pt0_phys);
+    }
+
+    /* ── PDE 1 .. (KERNEL_PDE_COUNT-1): shared — skip ── */
+
+    /* ── PDE KERNEL_PDE_COUNT .. 1023: per-process user pages ── */
+    for (uint32_t i = KERNEL_PDE_COUNT; i < TABLES_PER_DIR; i++) {
+        if (!(dir->entries[i] & PAGE_PRESENT)) continue;
+
+        uint32_t pt_phys = dir->entries[i] & PAGE_FRAME_MASK;
+        page_table_t *pt = (page_table_t *)pt_phys;
+
+        /* Free every mapped physical page in this table */
+        for (uint32_t j = 0; j < PAGES_PER_TABLE; j++) {
+            if (pt->entries[j] & PAGE_PRESENT) {
+                uint32_t frame = pt->entries[j] & PAGE_FRAME_MASK;
+                free_page(frame);
+            }
+        }
+
+        /* Free the page table page itself */
+        free_page(pt_phys);
+    }
+
+    /* ── Free the directory page ── */
+    free_page((uint32_t)dir);
+}
+
+/**
+ * paging_get_kernel_cr3 - Return the kernel page directory physical address
+ */
+uint32_t paging_get_kernel_cr3(void) {
+    return pd_physical_address;
 }
