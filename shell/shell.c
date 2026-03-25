@@ -7,6 +7,8 @@
 #include "../kernel/mem/pmm.h"
 #include "../kernel/mem/paging.h"
 #include "../kernel/sys/timer.h"
+#include "../tests/test_multitask.h"
+#include "../tests/test_userspace.h"
 
 /*
  * ApPa Simple Command Shell
@@ -33,6 +35,8 @@ static void cmd_write(const char* args);
 static void cmd_mkdir(const char* args);
 static void cmd_rm(const char* args);
 static void cmd_disk(void);
+static void cmd_tasktest(void);
+static void cmd_usertest(void);
 
 /**
  * shell_init - Initialize the shell
@@ -133,6 +137,10 @@ void shell_execute(const char* cmd) {
 		cmd_rm(args);
 	} else if (strncmp(cmd, "disk", cmd_len) == 0 && cmd_len == 4) {
 		cmd_disk();
+	} else if (strncmp(cmd, "tasktest", cmd_len) == 0 && cmd_len == 8) {
+		cmd_tasktest();
+	} else if (strncmp(cmd, "usertest", cmd_len) == 0 && cmd_len == 8) {
+		cmd_usertest();
 	} else {
 		kprint("Unknown command: ");
 		kprint((char*)cmd);
@@ -158,6 +166,8 @@ static void cmd_help(void) {
 	kprint("  mkdir <name> - Create a directory\n");
 	kprint("  rm <name>    - Delete a file or directory\n");
 	kprint("  disk         - Show ATA disk information\n");
+	kprint("  tasktest     - Run multitasking tests\n");
+	kprint("  usertest     - Run Ring 3 userspace tests\n");
 	kprint("  color <name> - Change text color\n");
 	kprint("               Colors: white, red, green, blue, yellow,\n");
 	kprint("                       cyan, magenta, grey, black\n");
@@ -477,4 +487,22 @@ static void cmd_rm(const char* args) {
  */
 static void cmd_disk(void) {
 	ata_status();
+}
+
+/**
+ * cmd_tasktest - Run multitasking tests
+ * Spawns test tasks and verifies context switching, scheduling,
+ * task lifecycle, and interleaving.
+ */
+static void cmd_tasktest(void) {
+	test_multitask();
+}
+
+/**
+ * cmd_usertest - Run Phase 13 userspace tests
+ * Spawns Ring 3 tasks and verifies syscalls (write, getpid, yield, exit)
+ * and GPF isolation (privileged instruction in user mode → killed).
+ */
+static void cmd_usertest(void) {
+	test_userspace();
 }

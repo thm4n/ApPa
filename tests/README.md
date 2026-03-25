@@ -4,7 +4,11 @@ Unit test suite for the ApPa kernel. All tests run automatically during boot, af
 
 ## Current Test Results
 
-**47 `[PASS]` assertions across 7 checkpoints, 0 failures.**
+**47 `[PASS]` assertions across 7 checkpoints at boot, 0 failures.**
+
+Additionally, two test suites run on-demand via shell commands:
+- `tasktest` — 6 multitasking tests (Phase 12)
+- `usertest` — 3 Ring 3 userspace tests (Phase 13)
 
 ## Structure
 
@@ -20,6 +24,8 @@ tests/
 ├── test_paging.c/h        # Checkpoint 5: paging subsystem (8 tests)
 ├── test_ata.c/h           # Checkpoint 6: ATA PIO driver (5 tests)
 ├── test_fs.c/h            # Checkpoint 7: SimpleFS filesystem (10 tests)
+├── test_multitask.c/h     # Post-boot: multitasking (6 tests, shell: `tasktest`)
+├── test_userspace.c/h     # Post-boot: Ring 3 userspace (3 tests, shell: `usertest`)
 └── test_template.c/h.example  # Template for new tests
 ```
 
@@ -47,19 +53,37 @@ Tests the circular kernel log buffer and log levels. Currently disabled for debu
 ### Checkpoint 7: `test_fs` — SimpleFS Filesystem
 10 tests: file create, duplicate rejection, write, read+verify, stat, mkdir, directory listing, second file round-trip, delete+verify, nonexistent file error.
 
+### Post-Boot: `test_multitask` — Multitasking (shell: `tasktest`)
+6 tests: task creation, context switch verification, preemptive scheduling interleaving, task exit + reap, multi-task concurrent execution, scheduling order analysis. Requires the scheduler to be active; run via `tasktest` shell command.
+
+### Post-Boot: `test_userspace` — Ring 3 Userspace (shell: `usertest`)
+3 tests:
+1. **SYS_WRITE + SYS_GETPID + SYS_EXIT** — User task prints "Hello from Ring 3!" via INT 0x80, reads its PID, and exits cleanly
+2. **SYS_YIELD** — User task cooperatively yields the CPU multiple times
+3. **GPF isolation** — User task executes `cli` (privileged instruction) at Ring 3; kernel catches the #GP, kills only that task, system continues
+
 ## Running Tests
 
-Tests execute automatically when the kernel boots:
+Boot-time tests execute automatically:
 
 ```
 kernel_main()
-  → GDT, IDT, PIC, PIT, timer init
-  → kmalloc, PMM, paging init
-  → ATA, RAM disk, SimpleFS init
-  → keyboard, shell init
-  → interrupts enabled
-  → run_all_tests()          ← tests run here
-  → shell prompt
+  -> GDT, IDT, PIC, PIT, timer init
+  -> kmalloc, PMM, paging init
+  -> ATA, RAM disk, SimpleFS init
+  -> keyboard, shell init
+  -> scheduler init, syscall init
+  -> interrupts enabled
+  -> run_all_tests()          <- 7 checkpoints run here
+  -> scheduler enabled
+  -> shell prompt
+```
+
+Post-boot tests (require scheduler to be active):
+
+```
+> tasktest     <- runs Phase 12 multitasking tests
+> usertest     <- runs Phase 13 Ring 3 userspace tests
 ```
 
 To run headless and inspect results:
@@ -71,7 +95,7 @@ make run-term
 
 Count passes:
 ```bash
-grep -c '\[PASS\]' last_run.log
+grep -c '\[PASS\]\|\[OK\]' last_run.log
 ```
 
 ## Adding a New Test

@@ -8,8 +8,11 @@ A bare-metal x86 operating system built from scratch — two-stage bootloader, p
 # Graphical QEMU window (use keyboard in the QEMU window)
 make clean && make run
 
-# Headless terminal mode (serial output to stdout)
+# Terminal mode with curses display (keyboard works)
 make clean && make run-term
+
+# Serial logging mode (output to stdout, no keyboard)
+make clean && make run-log
 
 # Debug with GDB
 make debug
@@ -28,16 +31,20 @@ Initializing system...
   [OK] Kernel heap initialized
   [OK] Physical memory manager initialized
   [OK] Paging enabled (identity map 0-16MB)
+  [OK] TSS initialized
   [OK] Kernel logging initialized
   [OK] ATA disk detected: QEMU HARDDISK
   [OK] RAM disk initialized (256 KB)
   [OK] SimpleFS mounted
   [OK] Keyboard initialized
   [OK] Shell initialized
+  [OK] Scheduler initialized
+  [OK] Syscall interface initialized (INT 0x80)
   [OK] Interrupts enabled
 
   ... unit tests run (7 checkpoints, 47 assertions) ...
 
+  [OK] Preemptive scheduling enabled
 === ApPa OS Ready ===
 > 
 ```
@@ -59,6 +66,8 @@ Initializing system...
 | `mkdir <name>` | Create a directory |
 | `rm <name>` | Delete a file or directory |
 | `disk` | Show ATA disk information |
+| `tasktest` | Run multitasking tests (Phase 12) |
+| `usertest` | Run Ring 3 userspace tests (Phase 13) |
 | `color <name>` | Change text color (16 VGA colors) |
 
 ---
@@ -90,11 +99,20 @@ ApPa/
 │   │   ├── irq.c/h         #   Hardware interrupt handlers (IRQ 0-15)
 │   │   ├── irq_stubs.asm   #   IRQ assembly entry points
 │   │   ├── pic.c/h         #   8259 PIC driver (remap, EOI, mask)
-│   │   └── pit.c/h         #   8253 PIT driver (timer hardware)
+│   │   ├── pit.c/h         #   8253 PIT driver (timer hardware)
+│   │   ├── tss.c/h         #   Task State Segment (Ring 0 stack for interrupts)
+│   │   ├── tss_flush.asm   #   Load Task Register (ltr)
+│   │   ├── syscall.c/h     #   INT 0x80 dispatch table, syscall handlers, GPF handler
+│   │   └── syscall_stub.asm #  INT 0x80 assembly entry point
 │   ├── mem/                # Memory management
 │   │   ├── kmalloc.c/h     #   Kernel heap allocator (best-fit, 1-2MB)
 │   │   ├── pmm.c/h         #   Physical memory manager (bitmap, 4KB pages)
 │   │   └── paging.c/h      #   Virtual memory (two-level page tables, identity map)
+│   ├── task/               # Multitasking (Phase 12-13)
+│   │   ├── task.c/h        #   Task Control Block, create/exit/reap, user-mode tasks
+│   │   ├── sched.c/h       #   Round-robin preemptive scheduler
+│   │   ├── switch.asm      #   Low-level context switch (callee-saved regs)
+│   │   └── umode.asm       #   User-mode entry trampoline (iret to Ring 3)
 │   └── sys/                # Core kernel services
 │       ├── kernel_main.c   #   Kernel entry point and initialization sequence
 │       ├── timer.c/h       #   System timer (IRQ0, uptime tracking)
@@ -121,9 +139,10 @@ ApPa/
 │   ├── stddef.h            #   size_t, NULL
 │   ├── stdarg.h            #   va_list, va_start, va_arg, va_end
 │   ├── string.c/h          #   String/memory functions (strlen, strcmp, memcpy, memcmp, ...)
-│   └── stdio.c/h           #   kprintf (formatted output to VGA)
+│   ├── stdio.c/h           #   kprintf (formatted output to VGA)
+│   └── syscall.c/h         #   User-side INT 0x80 wrappers (sys_write, sys_exit, ...)
 │
-├── tests/                  # Unit test suite (47 assertions, 7 checkpoints)
+├── tests/                  # Unit test suite (47+ assertions, 7 checkpoints)
 │   ├── tests.c/h           #   Test runner and master header
 │   ├── test_varargs.c/h    #   va_list system tests
 │   ├── test_printf.c/h     #   kprintf format specifier tests (10 test groups)
@@ -131,7 +150,9 @@ ApPa/
 │   ├── test_pmm.c/h        #   Physical memory manager tests (15 tests)
 │   ├── test_paging.c/h     #   Paging subsystem tests (8 tests)
 │   ├── test_ata.c/h        #   ATA PIO driver tests (5 tests)
-│   └── test_fs.c/h         #   SimpleFS filesystem tests (10 tests)
+│   ├── test_fs.c/h         #   SimpleFS filesystem tests (10 tests)
+│   ├── test_multitask.c/h  #   Multitasking tests (6 tests, run via `tasktest` command)
+│   └── test_userspace.c/h  #   Ring 3 userspace tests (run via `usertest` command)
 │
 ├── Information/            # Design documents and implementation guides
 ├── makefile                # Build system (cross-compiler, auto-patch sector count)
@@ -155,13 +176,15 @@ ApPa/
 | 9 | Physical Memory Manager | `kernel/mem/pmm.c` | ✅ Done |
 | 10 | Paging / Virtual Memory | `kernel/mem/paging.c` | ✅ Done |
 | 11 | File System & Disk I/O | `drivers/ata.c`, `fs/simplefs.c`, `fs/ramdisk.c` | ✅ Done |
-| 12 | TBD | — | ⬜ Next |
+| 12 | Multitasking | `kernel/task/sched.c`, `task.c`, `switch.asm`, `kernel/arch/tss.c` | ✅ Done |
+| 13 | Userspace (Ring 3) | `kernel/arch/syscall.c`, `syscall_stub.asm`, `kernel/task/umode.asm`, `libc/syscall.c` | ✅ Done |
+| 14 | Per-Process Address Spaces | — | ⬜ Next |
 
 ### Future Directions
 
-- **Multitasking** — Task scheduler, context switching, TSS
-- **Userspace** — Ring 3 processes, syscalls (INT 0x80)
+- **Per-Process Address Spaces** — Private page directories, CR3 switching (Phase 14, planned)
 - **ELF Loader** — Load and execute programs from disk
+- **Blocking I/O / IPC** — Sleep queues, pipes, message passing
 - **Networking** — NE2000 driver, basic TCP/IP stack
 - **Graphics** — VESA VBE framebuffer mode
 
@@ -218,7 +241,8 @@ The kernel sector count is **auto-patched** into `stage2.bin` at offset `STAGE2_
 |--------|-------------|
 | `make build` | Compile and link (no QEMU) |
 | `make run` | Build + launch QEMU with graphical window |
-| `make run-term` | Build + launch QEMU in terminal mode (serial to stdout) |
+| `make run-term` | Build + launch QEMU with curses display (terminal VGA + keyboard) |
+| `make run-log` | Build + launch QEMU with serial to stdout (no keyboard, tee'd to last_run.log) |
 | `make debug` | Build + launch QEMU + connect GDB |
 | `make clean` | Remove all build artifacts |
 
@@ -228,4 +252,4 @@ The kernel sector count is **auto-patched** into `stage2.bin` at offset `STAGE2_
 
 Tests run automatically during kernel boot (after all subsystems initialize, before the shell prompt). See [tests/README.md](tests/README.md) for the test framework guide.
 
-**Current results:** 47 `[PASS]` assertions across 7 checkpoints, 0 failures.
+**Current results:** 47 `[PASS]` assertions across 7 checkpoints at boot, plus `tasktest` (6 multitasking tests) and `usertest` (3 Ring 3 syscall/GPF tests) available as shell commands.

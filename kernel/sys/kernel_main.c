@@ -16,6 +16,7 @@
 #include "klog.h"
 #include "../task/task.h"
 #include "../task/sched.h"
+#include "../arch/syscall.h"
 #include "../../shell/shell.h"
 #include "../../tests/tests.h"
 
@@ -125,6 +126,12 @@ void main() {
 	// Wraps the current execution context as the bootstrap/idle task
 	sched_init();
 	kprint("  [OK] Scheduler initialized\n");
+
+	// Phase 13: Initialize system call interface
+	// Registers INT 0x80 as a DPL=3 trap gate and populates the
+	// syscall dispatch table (SYS_EXIT, SYS_WRITE, etc.)
+	syscall_init();
+	kprint("  [OK] Syscall interface initialized (INT 0x80)\n");
 
 	// Phase 7: Enable interrupts globally
 	// The STI (Set Interrupt Flag) instruction allows the CPU to

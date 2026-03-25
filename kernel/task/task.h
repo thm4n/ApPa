@@ -42,6 +42,10 @@ typedef struct task {
     uint32_t        esp0;                   // Kernel stack top (written to TSS)
     uint32_t        *kernel_stack;          // Base of allocated kernel stack page
 
+    uint32_t        *user_stack;            // Base of allocated user stack page (NULL for kernel tasks)
+    uint32_t        user_stack_top;         // Top of user stack (used in iret frame)
+    uint8_t         is_user;                // 1 = Ring 3 task, 0 = Ring 0 task
+
     struct task     *next;                  // Next task in the ready / free list
 } task_t;
 
@@ -85,5 +89,18 @@ task_t* task_get_current(void);
  * kernel stacks and TCB slots.
  */
 void task_reap(void);
+
+/**
+ * task_create_user - Spawn a new Ring 3 (user-mode) task
+ * @entry: Entry point that will execute in user mode
+ * @name:  Human-readable name
+ *
+ * Allocates both a kernel stack and a user stack, builds a fake
+ * iret frame on the kernel stack so the first context switch drops
+ * into Ring 3 at @entry via enter_usermode.
+ *
+ * Returns: Pointer to the new task, or NULL on failure.
+ */
+task_t* task_create_user(task_entry_t entry, const char *name);
 
 #endif // TASK_H

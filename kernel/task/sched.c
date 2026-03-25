@@ -67,8 +67,12 @@ static void switch_to(task_t *next) {
 
     task_t *prev = current_task;
 
-    // Mark states
-    prev->state = TASK_READY;
+    // Only demote to READY if the task was actually RUNNING.
+    // A DEAD task (from task_exit) must stay DEAD so the reaper
+    // can find and free it.
+    if (prev->state == TASK_RUNNING) {
+        prev->state = TASK_READY;
+    }
     next->state = TASK_RUNNING;
     current_task = next;
 
@@ -162,4 +166,40 @@ task_t* sched_get_current(void) {
 
 int sched_is_enabled(void) {
     return scheduler_on;
+}
+
+void sched_remove_task(task_t *task) {
+    if (!task || !ready_head) return;
+
+    // Never remove the boot/idle task
+    if (task == &boot_task) return;
+
+    __asm__ volatile("cli");
+
+    // Single-node circle (shouldn't happen — boot_task is always present)
+    if (task->next == task) {
+        ready_head = 0;
+        task->next = 0;
+        __asm__ volatile("sti");
+        return;
+    }
+
+    // Walk the circle to find the predecessor
+    task_t *prev = ready_head;
+    task_t *start = prev;
+    do {
+        if (prev->next == task) {
+            prev->next = task->next;
+            if (ready_head == task) {
+                ready_head = task->next;
+            }
+            task->next = 0;
+            __asm__ volatile("sti");
+            return;
+        }
+        prev = prev->next;
+    } while (prev != start);
+
+    // Not found — already removed or never added
+    __asm__ volatile("sti");
 }

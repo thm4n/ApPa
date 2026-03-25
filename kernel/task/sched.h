@@ -78,4 +78,13 @@ task_t* sched_get_current(void);
  */
 int sched_is_enabled(void);
 
+/**
+ * sched_remove_task - Unlink a task from the circular ready queue
+ * @task: Task to remove (must not be the boot/idle task)
+ *
+ * Called by task_reap() before freeing a dead task's resources so
+ * the circular linked list is not corrupted.
+ */
+void sched_remove_task(task_t *task);
+
 #endif // SCHED_H

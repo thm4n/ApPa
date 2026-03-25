@@ -120,9 +120,15 @@ run-graphics: $(BIN_DIR)/image.bin
 	@echo "[DEBUG] Running QEMU (graphics): $<"
 	qemu-system-i386 -s -drive file=$<,format=raw
 
-# Run QEMU with serial output tee'd to stdout and last_run.log
+# Run QEMU with curses display (terminal-based VGA with PS/2 keyboard)
 run-term: $(BIN_DIR)/image.bin
-	@echo "[DEBUG] Running QEMU (terminal): $<"
+	@echo "[DEBUG] Running QEMU (terminal curses): $<"
+	@echo "[INFO] Press ESC then 2 for QEMU monitor, Ctrl+A then X to exit"
+	qemu-system-i386 -s -drive file=$<,format=raw -display curses
+
+# Run QEMU with serial output tee'd to stdout (no keyboard input)
+run-log: $(BIN_DIR)/image.bin
+	@echo "[DEBUG] Running QEMU (logging): $<"
 	@echo "[INFO] Output: stdout + last_run.log | Ctrl+A then X to exit"
 	@rm -f last_run.log
 	qemu-system-i386 -s -drive file=$<,format=raw -serial mon:stdio -nographic 2>&1 | tee last_run.log
@@ -163,4 +169,4 @@ clean:
 	rm -f $(wildcard *.o */*.o */*/*.o)
 	@echo "[DEBUG] Clean complete"
 
-.PHONY: all build run run-graphics run-term debug clean check
+.PHONY: all build run run-graphics run-term run-log debug clean check

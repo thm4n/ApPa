@@ -166,6 +166,12 @@ void paging_init(void) {
 /**
  * paging_map_page - Map a 4 KB virtual page to a physical frame
  */
+void paging_map_user(uint32_t virt, uint32_t phys, int rw) {
+    uint32_t flags = PAGE_PRESENT | PAGE_USER;
+    if (rw) flags |= PAGE_WRITABLE;
+    paging_map_page(virt, phys, flags);
+}
+
 void paging_map_page(uint32_t virt, uint32_t phys, uint32_t flags) {
     uint32_t pd_idx = PAGE_DIR_INDEX(virt);
     uint32_t pt_idx = PAGE_TABLE_INDEX(virt);
@@ -183,6 +189,11 @@ void paging_map_page(uint32_t virt, uint32_t phys, uint32_t flags) {
 
         kernel_directory->entries[pd_idx] = pt_phys | PAGE_PRESENT | PAGE_WRITABLE | (flags & PAGE_USER);
         pd_tables[pd_idx] = pt;
+    } else if (flags & PAGE_USER) {
+        /* PDE already exists — ensure PAGE_USER is propagated.
+         * x86 checks both the PDE and PTE User/Supervisor bits;
+         * if the PDE lacks it, Ring 3 can never access the page. */
+        kernel_directory->entries[pd_idx] |= PAGE_USER;
     }
 
     // Set the PTE
@@ -191,6 +202,36 @@ void paging_map_page(uint32_t virt, uint32_t phys, uint32_t flags) {
 
     // Flush TLB for this virtual address
     flush_tlb_entry(virt);
+}
+
+/**
+ * paging_enable_user_access - Mark 0-16 MB identity mapping as user-accessible
+ */
+void paging_enable_user_access(void) {
+    /* The first 4 page tables (indices 0-3) cover 0-16 MB.
+     * Set PAGE_USER on each PDE and every PTE within. */
+    for (uint32_t i = 0; i < 4; i++) {
+        if (!(kernel_directory->entries[i] & PAGE_PRESENT))
+            continue;
+
+        /* Set USER bit on the PDE */
+        kernel_directory->entries[i] |= PAGE_USER;
+
+        /* Set USER bit on every PTE in this table */
+        page_table_t *pt = pd_tables[i];
+        if (!pt) continue;
+
+        for (uint32_t j = 0; j < PAGES_PER_TABLE; j++) {
+            if (pt->entries[j] & PAGE_PRESENT) {
+                pt->entries[j] |= PAGE_USER;
+            }
+        }
+    }
+
+    /* Flush TLB by reloading CR3 */
+    uint32_t cr3;
+    __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
+    __asm__ volatile("mov %0, %%cr3" : : "r"(cr3));
 }
 
 /**

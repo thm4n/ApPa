@@ -9,6 +9,8 @@
 #include "test_paging.h"
 #include "test_ata.h"
 #include "test_fs.h"
+#include "test_multitask.h"
+#include "test_userspace.h"
 
 // Master function to run all tests
 void run_all_tests();

@@ -46,4 +46,6 @@ void run_all_tests() {
 	kprint("       ALL TESTS COMPLETED\n");
 	kprint("=====================================\n");
 	kprint("\n");
+
+	// Note: Userspace tests run AFTER sched_enable() — see kernel_main.c
 }

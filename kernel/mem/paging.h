@@ -123,4 +123,29 @@ uint32_t paging_translate(uint32_t virt);
  */
 void paging_status(void);
 
+/**
+ * paging_map_user - Map a page accessible from Ring 3
+ * @virt:  Virtual address (page-aligned)
+ * @phys:  Physical address (page-aligned)
+ * @rw:    1 = writable, 0 = read-only
+ *
+ * Convenience wrapper that sets PAGE_PRESENT | PAGE_USER and
+ * optionally PAGE_WRITABLE.
+ */
+void paging_map_user(uint32_t virt, uint32_t phys, int rw);
+
+/**
+ * paging_enable_user_access - Mark identity-mapped pages as user-accessible
+ *
+ * Sets PAGE_USER on the PDE and every PTE in the first N page tables
+ * that were created by paging_init().  This allows Ring 3 code to
+ * execute kernel-linked functions (since user "programs" are currently
+ * compiled into the kernel binary).
+ *
+ * SECURITY NOTE: This grants user-mode read/write access to ALL
+ * identity-mapped memory including kernel data.  True isolation
+ * requires per-process page directories (future phase).
+ */
+void paging_enable_user_access(void);
+
 #endif // PAGING_H
