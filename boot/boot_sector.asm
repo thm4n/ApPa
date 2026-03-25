@@ -34,7 +34,7 @@ load_stage2:
 
 	; Load stage 2 bootloader (4 sectors at 0x0600)
 	; Placed below kernel (0x1000) so kernel load can't overwrite it
-	mov bx, 0x0600            ; Load stage2 at 0x0600 (0x0600-0x0DFF = 2KB)
+	mov bx, 0x0600           ; Load stage2 at 0x0600 (0x0600-0x0DFF = 2KB)
 	mov dh, 4                 ; Load 4 sectors (2KB for stage2)
 	mov dl, [BOOT_DRIVE]
 	call disk_load

@@ -96,3 +96,34 @@ void* memcpy(void* dest, const void* src, uint32_t n) {
         *d++ = *s++;
     return dest;
 }
+
+int memcmp(const void* s1, const void* s2, uint32_t n) {
+    const unsigned char* p1 = (const unsigned char*)s1;
+    const unsigned char* p2 = (const unsigned char*)s2;
+    while (n--) {
+        if (*p1 != *p2)
+            return *p1 - *p2;
+        p1++;
+        p2++;
+    }
+    return 0;
+}
+
+char* strchr(const char* str, int c) {
+    while (*str) {
+        if (*str == (char)c)
+            return (char*)str;
+        str++;
+    }
+    return (c == '\0') ? (char*)str : (char*)0;
+}
+
+char* strrchr(const char* str, int c) {
+    const char* last = (char*)0;
+    while (*str) {
+        if (*str == (char)c)
+            last = str;
+        str++;
+    }
+    return (c == '\0') ? (char*)str : (char*)last;
+}

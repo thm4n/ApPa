@@ -9,15 +9,7 @@
  * CPU interrupt numbers.
  */
 
-/**
- * io_wait - Small delay for old hardware
- * 
- * The PIC is slow hardware and needs time between commands.
- * Writing to port 0x80 (POST diagnostic port) provides a safe delay.
- */
-static void io_wait(void) {
-    port_byte_out(0x80, 0);
-}
+/* io_wait() is now provided by drivers/ports.c */
 
 /**
  * pic_remap - Remap PIC interrupt vectors

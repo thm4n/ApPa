@@ -7,6 +7,9 @@
 #include "timer.h"
 #include "pmm.h"
 #include "paging.h"
+#include "../drivers/ata.h"
+#include "../fs/ramdisk.h"
+#include "../fs/simplefs.h"
 #include "../drivers/keyboard.h"
 #include "kmalloc.h"
 #include "klog.h"
@@ -72,6 +75,32 @@ void main() {
 	kprint("  [OK] Kernel logging initialized (DISABLED FOR DEBUG)\n");
 	//klog_info("ApPa Kernel v0.1 booting...");
 	//klog_info("Memory, IDT, and PIC configured");
+
+	// Phase 4.8: Initialize ATA disk driver
+	// Detect primary master drive and read IDENTIFY data
+	ata_init();
+	const ata_drive_info_t* disk = ata_get_info();
+	if (disk->present) {
+		kprint("  [OK] ATA disk detected: ");
+		kprint((char*)disk->model);
+		kprint("\n");
+	} else {
+		kprint("  [--] No ATA disk detected\n");
+	}
+
+	// Phase 4.9: Initialize RAM disk and filesystem
+	// Create a 256KB RAM disk and format it with SimpleFS
+	block_device_t* ramdisk = ramdisk_init(256);
+	if (ramdisk) {
+		kprint("  [OK] RAM disk initialized (256 KB)\n");
+		if (fs_init(ramdisk) == 0) {
+			kprint("  [OK] SimpleFS mounted\n");
+		} else {
+			kprint("  [FAIL] SimpleFS init failed\n");
+		}
+	} else {
+		kprint("  [FAIL] RAM disk init failed\n");
+	}
 
 	// Phase 5: Initialize keyboard driver
 	// Registers a handler for IRQ1 (keyboard interrupt)

@@ -1,6 +1,8 @@
 #include "shell.h"
 #include "../drivers/screen.h"
+#include "../drivers/ata.h"
 #include "../libc/string.h"
+#include "../fs/simplefs.h"
 #include "kmalloc.h"
 #include "pmm.h"
 #include "paging.h"
@@ -25,6 +27,12 @@ static void cmd_pmem(void);
 static void cmd_color(const char* args);
 static void cmd_uptime(void);
 static void cmd_pagedir(void);
+static void cmd_ls(const char* args);
+static void cmd_cat(const char* args);
+static void cmd_write(const char* args);
+static void cmd_mkdir(const char* args);
+static void cmd_rm(const char* args);
+static void cmd_disk(void);
 
 /**
  * shell_init - Initialize the shell
@@ -113,6 +121,18 @@ void shell_execute(const char* cmd) {
 		cmd_uptime();
 	} else if (strncmp(cmd, "pagedir", cmd_len) == 0 && cmd_len == 7) {
 		cmd_pagedir();
+	} else if (strncmp(cmd, "ls", cmd_len) == 0 && cmd_len == 2) {
+		cmd_ls(args);
+	} else if (strncmp(cmd, "cat", cmd_len) == 0 && cmd_len == 3) {
+		cmd_cat(args);
+	} else if (strncmp(cmd, "write", cmd_len) == 0 && cmd_len == 5) {
+		cmd_write(args);
+	} else if (strncmp(cmd, "mkdir", cmd_len) == 0 && cmd_len == 5) {
+		cmd_mkdir(args);
+	} else if (strncmp(cmd, "rm", cmd_len) == 0 && cmd_len == 2) {
+		cmd_rm(args);
+	} else if (strncmp(cmd, "disk", cmd_len) == 0 && cmd_len == 4) {
+		cmd_disk();
 	} else {
 		kprint("Unknown command: ");
 		kprint((char*)cmd);
@@ -132,6 +152,12 @@ static void cmd_help(void) {
 	kprint("  pmem         - Display physical memory statistics\n");
 	kprint("  uptime       - Show system uptime\n");
 	kprint("  pagedir      - Display page directory info\n");
+	kprint("  ls           - List files and directories\n");
+	kprint("  cat <file>   - Display file contents\n");
+	kprint("  write <file> <text> - Write text to a file\n");
+	kprint("  mkdir <name> - Create a directory\n");
+	kprint("  rm <name>    - Delete a file or directory\n");
+	kprint("  disk         - Show ATA disk information\n");
 	kprint("  color <name> - Change text color\n");
 	kprint("               Colors: white, red, green, blue, yellow,\n");
 	kprint("                       cyan, magenta, grey, black\n");
@@ -272,4 +298,183 @@ static void cmd_color(const char* args) {
 	// Set the new color
 	set_text_color(VGA_COLOR(fg, bg));
 	kprint("Color changed.\n");
+}
+
+/* ========== Phase 11: File System & Disk Commands ========== */
+
+/**
+ * cmd_ls - List files and directories
+ */
+static void cmd_ls(const char* args) {
+	(void)args;  /* No subdirectory support in v1 */
+
+	fs_entry_t entries[FS_MAX_ENTRIES];
+	uint32_t count = fs_list(entries, FS_MAX_ENTRIES);
+
+	if (count == 0) {
+		kprint("  (empty)\n");
+		return;
+	}
+
+	for (uint32_t i = 0; i < count; i++) {
+		/* Type */
+		if (entries[i].type == FS_TYPE_FILE) {
+			kprint("  FILE  ");
+		} else if (entries[i].type == FS_TYPE_DIR) {
+			kprint("  DIR   ");
+		} else {
+			kprint("  ???   ");
+		}
+
+		/* Size (right-justify in 8 chars) */
+		char size_str[16];
+		uitoa(entries[i].size, size_str, 10);
+		uint32_t slen = strlen(size_str);
+		for (uint32_t s = slen; s < 8; s++) kprint(" ");
+		kprint(size_str);
+		kprint(" B   ");
+
+		/* Name */
+		kprint(entries[i].name);
+		kprint("\n");
+	}
+
+	kprint("  ");
+	char count_str[16];
+	uitoa(count, count_str, 10);
+	kprint(count_str);
+	kprint(" entries\n");
+}
+
+/**
+ * cmd_cat - Display file contents
+ */
+static void cmd_cat(const char* args) {
+	if (!*args) {
+		kprint("Usage: cat <filename>\n");
+		return;
+	}
+
+	/* Read up to 4KB */
+	static char read_buf[4096];
+	int32_t bytes = fs_read_file(args, read_buf, sizeof(read_buf) - 1);
+
+	if (bytes < 0) {
+		kprint("Error: file not found '");
+		kprint((char*)args);
+		kprint("'\n");
+		return;
+	}
+
+	read_buf[bytes] = '\0';
+	kprint(read_buf);
+	kprint("\n");
+}
+
+/**
+ * cmd_write - Write text to a file
+ * Format: write <filename> <text...>
+ */
+static void cmd_write(const char* args) {
+	if (!*args) {
+		kprint("Usage: write <filename> <text>\n");
+		return;
+	}
+
+	/* Parse filename (first word) */
+	const char* name_start = args;
+	const char* name_end = args;
+	while (*name_end && *name_end != ' ') name_end++;
+	int name_len = name_end - name_start;
+
+	if (name_len == 0 || name_len > FS_NAME_MAX) {
+		kprint("Error: invalid filename\n");
+		return;
+	}
+
+	char filename[24];
+	strncpy(filename, name_start, name_len);
+	filename[name_len] = '\0';
+
+	/* Get text content (everything after filename) */
+	const char* text = name_end;
+	while (*text == ' ') text++;
+
+	if (!*text) {
+		kprint("Error: no text provided\n");
+		return;
+	}
+
+	/* Create file if it doesn't exist */
+	fs_entry_t stat;
+	if (fs_stat(filename, &stat) != 0) {
+		if (fs_create(filename, FS_TYPE_FILE) != 0) {
+			kprint("Error: could not create file\n");
+			return;
+		}
+	}
+
+	/* Write data */
+	uint32_t text_len = strlen(text);
+	if (fs_write_file(filename, text, text_len) != 0) {
+		kprint("Error: write failed\n");
+		return;
+	}
+
+	kprint("Written ");
+	char len_str[16];
+	uitoa(text_len, len_str, 10);
+	kprint(len_str);
+	kprint(" bytes to '");
+	kprint(filename);
+	kprint("'\n");
+}
+
+/**
+ * cmd_mkdir - Create a directory
+ */
+static void cmd_mkdir(const char* args) {
+	if (!*args) {
+		kprint("Usage: mkdir <name>\n");
+		return;
+	}
+
+	if (fs_create(args, FS_TYPE_DIR) != 0) {
+		kprint("Error: could not create directory '");
+		kprint((char*)args);
+		kprint("' (exists or full)\n");
+		return;
+	}
+
+	kprint("Created directory '");
+	kprint((char*)args);
+	kprint("'\n");
+}
+
+/**
+ * cmd_rm - Delete a file or directory
+ */
+static void cmd_rm(const char* args) {
+	if (!*args) {
+		kprint("Usage: rm <name>\n");
+		return;
+	}
+
+	if (fs_delete(args) != 0) {
+		kprint("Error: '");
+		kprint((char*)args);
+		kprint("' not found\n");
+		return;
+	}
+
+	kprint("Deleted '");
+	kprint((char*)args);
+	kprint("'\n");
+}
+
+/**
+ * cmd_disk - Show ATA disk information
+ */
+static void cmd_disk(void) {
+	ata_status();
 }

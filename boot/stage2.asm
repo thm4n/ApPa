@@ -1,5 +1,5 @@
 ; Stage 2 Bootloader
-; Loaded by boot sector at 0x9000
+; Loaded by boot sector at 0x0600
 ; Loads the full kernel from disk, switches to protected mode, and jumps to it
 
 [bits 16]

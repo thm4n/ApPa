@@ -123,16 +123,22 @@ ApPa Shell v0.1 - Type 'help' for commands
 
 ## Next Steps
 
-### Phase 11: File System & Disk I/O - **NEXT**
+### Phase 11: File System & Disk I/O - **COMPLETED**
 **Priority:** Medium | **Estimated:** 5-7 days  
 **Why:** Persistent storage, load programs from disk.
 
 **Prerequisites:** All previous phases completed  
 **Implementation:**
-- `drivers/ata.c` / `ata.h` - ATA/IDE disk driver (PIO mode)
-- Simple file system (RAM disk first, then FAT12 or custom FS)
-- VFS layer: `open()`, `read()`, `write()`, `close()`
-- Directory listing in shell (`ls` command)
+- `drivers/ata.c` / `ata.h` - ATA PIO polling driver (IDENTIFY, read/write sectors)
+- `drivers/ports.c` - Added `port_words_in()`, `port_words_out()`, `io_wait()`
+- `libc/string.c` - Added `memcmp()`, `strchr()`, `strrchr()`
+- `fs/block.h` - Block device abstraction (function-pointer interface)
+- `fs/ramdisk.c` / `ramdisk.h` - PMM-backed RAM disk (256KB)
+- `fs/simplefs.c` / `simplefs.h` - Custom filesystem (superblock, flat directory, contiguous allocation)
+- Shell commands: `ls`, `cat`, `write`, `mkdir`, `rm`, `disk`
+- Tests: `test_ata` (5 tests), `test_fs` (10 tests) — all passing
+
+### Phase 12: TBD - **NEXT**
 
 ### Future Enhancements
 - **Multitasking:** Task scheduler, context switching, TSS

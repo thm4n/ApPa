@@ -31,6 +31,17 @@ void run_all_tests() {
     kprint("\n>>> Starting test_paging...\n");
     test_paging();
     kprint(">>> CHECKPOINT 5: test_paging COMPLETE\n");	
+
+    // Test 6: ATA PIO driver
+    kprint("\n>>> Starting test_ata...\n");
+    test_ata();
+    kprint(">>> CHECKPOINT 6: test_ata COMPLETE\n");
+
+    // Test 7: SimpleFS filesystem
+    kprint("\n>>> Starting test_fs...\n");
+    test_fs();
+    kprint(">>> CHECKPOINT 7: test_fs COMPLETE\n");
+
 	kprint("\n=====================================\n");
 	kprint("       ALL TESTS COMPLETED\n");
 	kprint("=====================================\n");

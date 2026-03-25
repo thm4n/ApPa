@@ -18,5 +18,10 @@ void uitoa(uint32_t value, char* str, int base);
 // Memory functions
 void* memset(void* ptr, int value, uint32_t num);
 void* memcpy(void* dest, const void* src, uint32_t n);
+int memcmp(const void* s1, const void* s2, uint32_t n);
+
+// Character search functions
+char* strchr(const char* str, int c);
+char* strrchr(const char* str, int c);
 
 #endif
