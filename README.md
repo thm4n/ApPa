@@ -1,218 +1,65 @@
 # ApPa
-Interactive x86 OS with keyboard input support and dynamic memory allocation!
 
-## How to Build and Run
+A bare-metal x86 operating system built from scratch — two-stage bootloader, protected mode kernel, virtual memory, filesystem, and interactive shell.
+
+## Quick Start
 
 ```bash
+# Graphical QEMU window (use keyboard in the QEMU window)
 make clean && make run
+
+# Headless terminal mode (serial output to stdout)
+make clean && make run-term
+
+# Debug with GDB
+make debug
 ```
 
-The kernel will boot in QEMU and display:
+### Boot Output
+
 ```
 ApPa Kernel v0.1
-Initializing interrupt system...
+Initializing system...
+  [OK] GDT initialized
   [OK] IDT initialized
   [OK] PIC remapped
+  [OK] PIT initialized (100Hz)
+  [OK] Timer initialized
   [OK] Kernel heap initialized
+  [OK] Physical memory manager initialized
+  [OK] Paging enabled (identity map 0-16MB)
+  [OK] Kernel logging initialized
+  [OK] ATA disk detected: QEMU HARDDISK
+  [OK] RAM disk initialized (256 KB)
+  [OK] SimpleFS mounted
   [OK] Keyboard initialized
   [OK] Shell initialized
   [OK] Interrupts enabled
 
-=====================================
-       RUNNING UNIT TESTS
-=====================================
+  ... unit tests run (7 checkpoints, 47 assertions) ...
 
-=== Testing va_list system ===
-First: Hello
-Second (int): 42
-Third (string): World
-=====================================
-       ALL TESTS COMPLETED
-=====================================
-
-
-ApPa Shell v0.1 - Type 'help' for commands
+=== ApPa OS Ready ===
 > 
 ```
 
-**Try it:** Click in the QEMU window and use the shell!
-- Type `help` to see available commands
-- Type `color green` to change text color
-- Type `echo Hello World` to print text
-- Type `mem` to see memory statistics
-- Type `clear` to clear the screen
-- Use Backspace to edit and Enter to execute
+### Shell Commands
 
----
-
-## Current Development Status
-- ✅ **Phase 1: CPU Exception Handlers (ISRs 0-31)** - COMPLETED
-  - IDT structure and initialization
-  - 32 exception handlers for CPU faults
-  - Common exception handler with error reporting
-- ✅ **Phase 2: PIC Remapping** - COMPLETED
-  - PIC port and constant definitions (`kernel/pic.h`)
-  - PIC remap function to avoid IRQ/exception conflicts
-  - EOI (End-Of-Interrupt) handler for interrupt acknowledgment
-- ✅ **Phase 3: IRQ Handlers (ISRs 32-47)** - COMPLETED
-  - 16 IRQ assembly stubs (IRQ0-15 → INT 32-47)
-  - IRQ dispatcher with custom handler support
-  - Automatic EOI acknowledgment to PIC
-- ✅ **Phase 4: Keyboard Driver** - COMPLETED
-  - Scancode to ASCII translation table (US QWERTY)
-  - IRQ1 keyboard interrupt handler
-  - Backspace support
-- ✅ **Phase 5: Integration** - COMPLETED
-  - IDT initialization with exception and IRQ handlers
-  - PIC remapping during kernel startup
-  - Keyboard driver initialization
-  - Interrupts enabled globally
-  - **FULLY FUNCTIONAL KEYBOARD INPUT!**
-- ✅ **Phase 6: Dynamic Memory Allocator (Heap)** - COMPLETED
-  - Best-fit allocation algorithm (minimizes fragmentation)
-  - `kmalloc()` - allocate variable-sized memory blocks
-  - `kfree()` - free memory with forward and backward coalescing
-  - `kmalloc_init()` - heap initialization (1MB-2MB region)
-  - `kmalloc_status()` - debugging statistics
-  - **DYNAMIC MEMORY ALLOCATION WORKING!**
-- ✅ **Phase 7: Simple Command Shell** - COMPLETED
-  - Interactive command-line interface
-  - Command buffer and parsing
-  - Built-in commands:
-    - `help` - List available commands with descriptions
-    - `clear` - Clear the screen
-    - `echo <text>` - Print text to screen
-    - `mem` - Display memory allocation statistics
-    - `color <name>` - Change text color (16 VGA colors supported)
-  - VGA color system with foreground/background support
-  - String utilities (`strncmp` for command parsing)
-- ✅ **Phase 8: Timer (PIT - IRQ0)** - COMPLETED
-  - Dedicated timer module (`kernel/timer.c` and `kernel/timer.h`)
-  - IRQ0 interrupt handler for timer tick tracking
-  - Visual tick counter in top-right corner
-  - Uptime tracking functions: `get_uptime_seconds()`, `get_uptime_string()`
-  - `uptime` command in shell displays system uptime
-  - String utility functions: `strcat()`, `uitoa()` for formatting
-  - PIT configured at 100Hz (10ms tick intervals)
-  - **SYSTEM TIMER WORKING!**
-- ✅ **Phase 9: Physical Memory Manager (PMM)** - COMPLETED
-  - Bitmap allocator managing 16MB of physical RAM at 4KB page granularity
-  - Bitmap placed at 2MB (after kernel heap), 512 bytes for 4096 frames
-  - `pmm_init()` - Initialize bitmap and mark reserved regions
-  - `alloc_page()` / `alloc_pages(count)` - Allocate single or contiguous pages
-  - `free_page()` - Free pages with alignment, bounds, and double-free validation
-  - `pmm_status()` - Display physical memory statistics
-  - `get_total_memory()`, `get_used_memory()`, `get_free_memory()` - Query functions
-  - Reserved regions: low memory (0-1MB), kernel heap (1-2MB), device memory (15-16MB)
-  - `pmm` shell command and `pmm_status()` integrated into shell
-  - Unit tests: 15 tests covering allocation, freeing, contiguous alloc, double-free detection, unaligned/OOR rejection, zero-alloc, pool range validation, and stress testing
-  - **PHYSICAL MEMORY MANAGER WORKING!**
-- ✅ **Phase 10: Paging / Virtual Memory (MMU)** - COMPLETED
-  - Two-level page table structure (Page Directory + Page Tables) for x86 4 KB paging
-  - Identity mapping of first 16 MB (virtual == physical) — 5 PMM frames used (20 KB)
-  - `paging_init()` - Allocate PD + 4 PTs, fill identity map, load CR3, set CR0.PG
-  - `paging_map_page()` / `paging_unmap_page()` - Dynamic page mapping with auto PT allocation
-  - `paging_translate()` - Software page table walk returning physical address
-  - `page_fault_handler()` - ISR 14 with CR2 read, error code decode, diagnostic output
-  - `paging_status()` - Print PD summary (present tables, mapped pages, mapped MB)
-  - `pagedir` shell command for inspecting page directory state
-  - Unit tests: 8 tests covering identity map correctness, boundary pages, unmapped detection, dynamic map/unmap
-  - **PAGING ENABLED!**
-
----
-
-## Next Steps
-
-### Phase 11: File System & Disk I/O - **COMPLETED**
-**Priority:** Medium | **Estimated:** 5-7 days  
-**Why:** Persistent storage, load programs from disk.
-
-**Prerequisites:** All previous phases completed  
-**Implementation:**
-- `drivers/ata.c` / `ata.h` - ATA PIO polling driver (IDENTIFY, read/write sectors)
-- `drivers/ports.c` - Added `port_words_in()`, `port_words_out()`, `io_wait()`
-- `libc/string.c` - Added `memcmp()`, `strchr()`, `strrchr()`
-- `fs/block.h` - Block device abstraction (function-pointer interface)
-- `fs/ramdisk.c` / `ramdisk.h` - PMM-backed RAM disk (256KB)
-- `fs/simplefs.c` / `simplefs.h` - Custom filesystem (superblock, flat directory, contiguous allocation)
-- Shell commands: `ls`, `cat`, `write`, `mkdir`, `rm`, `disk`
-- Tests: `test_ata` (5 tests), `test_fs` (10 tests) — all passing
-
-### Phase 12: TBD - **NEXT**
-
-### Future Enhancements
-- **Multitasking:** Task scheduler, context switching, TSS
-- **Userspace:** Ring 3 processes, syscalls (INT 0x80)
-- **ELF Loader:** Load and execute programs from disk
-- **Networking:** NE2000 driver, basic TCP/IP stack
-- **Graphics:** VESA VBE framebuffer mode
-
----
-
-## Known Issues & Solutions
-
-### Kernel Size vs Bootloader Sector Count
-
-#### The Bug
-The bootloader uses BIOS INT 13h to load the kernel from disk. It reads a fixed number of 512-byte sectors into memory at `0x1000`. If the kernel grows larger than the allocated sectors, the excess code is never loaded from disk.
-
-**Symptoms:**
-- Triple fault / reboot loop
-- QEMU debug shows `check_exception old: 0xd new 0xd` (GPF → GPF → Double Fault)
-- Crash at addresses well above `0x1000` (unloaded code region)
-
-**Root cause:** Kernel binary exceeded the hardcoded sector count in `boot_sector.asm`.
-
-#### Current Solution (Auto-Patching)
-The makefile automatically:
-1. Calculates required sectors from `kernel.bin` size
-2. Patches the sector count byte in `boot_sector.bin` at build time
-3. Pads `image.bin` to match
-
-```makefile
-SECTOR_PATCH_OFFSET = 0x142  # Location of 'mov dh, X' immediate
-```
-
-The bootloader contains a placeholder:
-```asm
-KERNEL_SECTORS_PATCH:          ; Label for makefile to find offset
-    mov dh, 0                  ; PATCHED BY MAKEFILE
-```
-
-**Limit:** 63 sectors (~32KB). The build will fail if exceeded.
-
-#### Future Solution: Two-Stage Bootloader
-When the kernel exceeds 32KB, implement a two-stage bootloader:
-
-```
-Stage 1 (boot_sector.bin, 512 bytes):
-  - Loaded by BIOS at 0x7C00
-  - Loads Stage 2 from disk
-
-Stage 2 (stage2.bin, unlimited size):
-  - Can use LBA addressing for large disks
-  - Can read multiple chunks to load large kernels
-  - Loads kernel.bin at 0x1000
-  - Switches to protected mode
-  - Jumps to kernel
-
-Image layout:
-  [boot_sector.bin][stage2.bin][kernel.bin]
-```
-
-**Files to add:**
-- `boot/stage2.asm` - Second stage loader
-- Update `makefile` to build and concatenate stage2
-
-**When to implement:** When `kernel.bin` approaches 32KB.
-
-#### Recalculating the Patch Offset
-If `boot_sector.asm` changes significantly, recalculate the offset:
-```bash
-nasm -f bin boot/boot_sector.asm -o /dev/null -l /dev/stdout | grep KERNEL_SECTORS_PATCH
-# Or: hexdump -C bin/boot_sector.bin | grep "b6 00"
-```
-Update `SECTOR_PATCH_OFFSET` in `makefile` accordingly.
+| Command | Description |
+|---------|-------------|
+| `help` | List available commands |
+| `clear` | Clear the screen |
+| `echo <text>` | Print text to screen |
+| `mem` | Display heap allocation statistics |
+| `pmem` | Display physical memory statistics |
+| `uptime` | Show system uptime |
+| `pagedir` | Display page directory info |
+| `ls` | List files and directories |
+| `cat <file>` | Display file contents |
+| `write <file> <text>` | Write text to a file |
+| `mkdir <name>` | Create a directory |
+| `rm <name>` | Delete a file or directory |
+| `disk` | Show ATA disk information |
+| `color <name>` | Change text color (16 VGA colors) |
 
 ---
 
@@ -220,18 +67,165 @@ Update `SECTOR_PATCH_OFFSET` in `makefile` accordingly.
 
 ```
 ApPa/
-├── boot/              # Bootloader and boot-time assembly
-├── drivers/           # Hardware drivers (keyboard, screen, ports)
-├── kernel/            # Core kernel (IDT, IRQ, ISR, PIC, memory allocation)
-├── libc/              # Standard C library headers (stdint, stddef, stdarg)
-├── tests/             # Unit tests (run automatically at boot)
-├── Information/       # Documentation and implementation guides
-├── bin/               # Build artifacts (generated)
-├── makefile           # Build system
-└── README.md          # This file
+├── boot/                   # Two-stage bootloader
+│   ├── boot_sector.asm     #   Stage 1: loaded by BIOS at 0x7C00, loads stage2
+│   ├── stage2.asm          #   Stage 2: loads kernel, switches to 32-bit protected mode
+│   ├── kernel_entry.asm    #   Entry stub: calls main()
+│   ├── 32bit-gdt.asm       #   Boot-time GDT definition
+│   ├── switch_32pm.asm     #   Real mode → protected mode switch
+│   ├── print.asm           #   BIOS teletype print (real mode)
+│   ├── print_hex.asm       #   Hex value print (real mode)
+│   ├── print_32pm.asm      #   VGA print (protected mode)
+│   ├── disk_load.asm       #   BIOS INT 13h disk read
+│   └── dev_setup.asm       #   Device setup helpers
+│
+├── kernel/
+│   ├── arch/               # CPU & hardware architecture
+│   │   ├── gdt.c/h         #   Global Descriptor Table setup
+│   │   ├── gdt_flush.asm   #   GDT register load (lgdt)
+│   │   ├── idt.c/h         #   Interrupt Descriptor Table setup
+│   │   ├── idt_load.asm    #   IDT register load (lidt)
+│   │   ├── isr.c/h         #   CPU exception handlers (ISR 0-31)
+│   │   ├── isr_stubs.asm   #   ISR assembly entry points
+│   │   ├── irq.c/h         #   Hardware interrupt handlers (IRQ 0-15)
+│   │   ├── irq_stubs.asm   #   IRQ assembly entry points
+│   │   ├── pic.c/h         #   8259 PIC driver (remap, EOI, mask)
+│   │   └── pit.c/h         #   8253 PIT driver (timer hardware)
+│   ├── mem/                # Memory management
+│   │   ├── kmalloc.c/h     #   Kernel heap allocator (best-fit, 1-2MB)
+│   │   ├── pmm.c/h         #   Physical memory manager (bitmap, 4KB pages)
+│   │   └── paging.c/h      #   Virtual memory (two-level page tables, identity map)
+│   └── sys/                # Core kernel services
+│       ├── kernel_main.c   #   Kernel entry point and initialization sequence
+│       ├── timer.c/h       #   System timer (IRQ0, uptime tracking)
+│       └── klog.c/h        #   Kernel log buffer (circular, leveled)
+│
+├── drivers/                # Hardware device drivers
+│   ├── screen.c/h          #   VGA text mode driver (80×25, 16 colors, scrolling)
+│   ├── keyboard.c/h        #   PS/2 keyboard driver (IRQ1, US QWERTY)
+│   ├── serial.c/h          #   Serial port driver (COM1, used for -nographic)
+│   ├── ports.c/h           #   x86 I/O port access (inb, outb, word I/O)
+│   └── ata.c/h             #   ATA PIO driver (LBA28, IDENTIFY, read/write)
+│
+├── fs/                     # Filesystem layer
+│   ├── block.h             #   Block device interface (function pointers)
+│   ├── ramdisk.c/h         #   PMM-backed RAM disk (256KB)
+│   └── simplefs.c/h        #   SimpleFS (superblock, flat directory, contiguous alloc)
+│
+├── shell/                  # Interactive command shell
+│   ├── shell.c             #   Command parsing, dispatch, and all command handlers
+│   └── shell.h             #   Shell interface (init, input, execute)
+│
+├── libc/                   # Freestanding C library
+│   ├── stdint.h            #   Fixed-width integer types
+│   ├── stddef.h            #   size_t, NULL
+│   ├── stdarg.h            #   va_list, va_start, va_arg, va_end
+│   ├── string.c/h          #   String/memory functions (strlen, strcmp, memcpy, memcmp, ...)
+│   └── stdio.c/h           #   kprintf (formatted output to VGA)
+│
+├── tests/                  # Unit test suite (47 assertions, 7 checkpoints)
+│   ├── tests.c/h           #   Test runner and master header
+│   ├── test_varargs.c/h    #   va_list system tests
+│   ├── test_printf.c/h     #   kprintf format specifier tests (10 test groups)
+│   ├── test_scroll_log.c/h #   Kernel log tests (currently skipped)
+│   ├── test_pmm.c/h        #   Physical memory manager tests (15 tests)
+│   ├── test_paging.c/h     #   Paging subsystem tests (8 tests)
+│   ├── test_ata.c/h        #   ATA PIO driver tests (5 tests)
+│   └── test_fs.c/h         #   SimpleFS filesystem tests (10 tests)
+│
+├── Information/            # Design documents and implementation guides
+├── makefile                # Build system (cross-compiler, auto-patch sector count)
+└── README.md               # This file
 ```
 
-### Key Directories:
-- **tests/** - Unit testing framework. See [tests/README.md](tests/README.md) for details.
-- **Information/** - Detailed guides for each implementation phase.
-- **libc/** - Kernel-compatible C library functions.
+---
+
+## Development Phases
+
+| # | Phase | Key Files | Status |
+|---|-------|-----------|--------|
+| 1 | CPU Exception Handlers (ISR 0-31) | `kernel/arch/isr.c`, `isr_stubs.asm` | ✅ Done |
+| 2 | PIC Remapping | `kernel/arch/pic.c` | ✅ Done |
+| 3 | IRQ Handlers (IRQ 0-15) | `kernel/arch/irq.c`, `irq_stubs.asm` | ✅ Done |
+| 4 | PS/2 Keyboard Driver | `drivers/keyboard.c` | ✅ Done |
+| 5 | Integration & Interrupts | `kernel/arch/idt.c` | ✅ Done |
+| 6 | Dynamic Heap Allocator | `kernel/mem/kmalloc.c` | ✅ Done |
+| 7 | Command Shell | `shell/shell.c` | ✅ Done |
+| 8 | System Timer (PIT/IRQ0) | `kernel/arch/pit.c`, `kernel/sys/timer.c` | ✅ Done |
+| 9 | Physical Memory Manager | `kernel/mem/pmm.c` | ✅ Done |
+| 10 | Paging / Virtual Memory | `kernel/mem/paging.c` | ✅ Done |
+| 11 | File System & Disk I/O | `drivers/ata.c`, `fs/simplefs.c`, `fs/ramdisk.c` | ✅ Done |
+| 12 | TBD | — | ⬜ Next |
+
+### Future Directions
+
+- **Multitasking** — Task scheduler, context switching, TSS
+- **Userspace** — Ring 3 processes, syscalls (INT 0x80)
+- **ELF Loader** — Load and execute programs from disk
+- **Networking** — NE2000 driver, basic TCP/IP stack
+- **Graphics** — VESA VBE framebuffer mode
+
+---
+
+## Memory Layout
+
+```
+Physical Address          Usage
+─────────────────────────────────────────────
+0x00000000 - 0x000005FF   Interrupt Vector Table / BIOS Data
+0x00000600 - 0x000007FF   Stage 2 bootloader (loaded here)
+0x00001000 - 0x0000XXXX   Kernel code (loaded by stage2)
+     ...                  (free — stack grows down from below)
+0x0009FC00                Protected-mode stack top (ESP)
+0x000A0000 - 0x000BFFFF   VGA video memory
+0x000C0000 - 0x000FFFFF   BIOS ROM / reserved
+0x00100000 - 0x001FFFFF   Kernel heap (kmalloc, 1 MB)
+0x00200000                PMM bitmap (512 bytes for 4096 frames)
+0x00201000 - 0x00EFFFFF   PMM page pool (~13 MB of allocatable pages)
+0x00F00000 - 0x00FFFFFF   Reserved (device memory)
+```
+
+Real-mode bootloader stack: `SS:SP = 0x7000:0x0000` (physical 0x70000).
+
+---
+
+## Build System
+
+### Requirements
+
+- `i686-elf-gcc` / `i686-elf-ld` cross-compiler (at `~/.Code/CrossCompiler/i686_elf/bin/`)
+- `nasm` assembler
+- `qemu-system-i386`
+- `python3` (for sector count patching)
+
+### How It Works
+
+The makefile builds a raw disk image with three concatenated parts:
+
+```
+[boot_sector.bin (512 B)] [stage2.bin (2 KB)] [kernel.bin (~45 KB)]
+```
+
+1. **boot_sector.asm** → 512-byte MBR loaded by BIOS at 0x7C00
+2. **stage2.asm** → Loaded by stage 1 at 0x0600; loads the kernel into 0x1000 via BIOS INT 13h, switches to 32-bit protected mode, jumps to kernel
+3. **kernel.bin** → Flat binary linked at 0x1000
+
+The kernel sector count is **auto-patched** into `stage2.bin` at offset `STAGE2_PATCH_OFFSET` (0x3F) during the build so the bootloader always loads the correct number of sectors.
+
+### Make Targets
+
+| Target | Description |
+|--------|-------------|
+| `make build` | Compile and link (no QEMU) |
+| `make run` | Build + launch QEMU with graphical window |
+| `make run-term` | Build + launch QEMU in terminal mode (serial to stdout) |
+| `make debug` | Build + launch QEMU + connect GDB |
+| `make clean` | Remove all build artifacts |
+
+---
+
+## Testing
+
+Tests run automatically during kernel boot (after all subsystems initialize, before the shell prompt). See [tests/README.md](tests/README.md) for the test framework guide.
+
+**Current results:** 47 `[PASS]` assertions across 7 checkpoints, 0 failures.

@@ -1,240 +1,162 @@
 # Tests Directory
 
-This directory contains all unit tests for the ApPa kernel.
+Unit test suite for the ApPa kernel. All tests run automatically during boot, after subsystem initialization and before the shell prompt.
+
+## Current Test Results
+
+**47 `[PASS]` assertions across 7 checkpoints, 0 failures.**
 
 ## Structure
 
 ```
 tests/
-├── README.md           # This file
-├── tests.h             # Master header - includes all test headers
-├── tests.c             # Master test runner - runs all tests
-├── test_varargs.h      # Variable arguments test header
-├── test_varargs.c      # Variable arguments test implementation
-└── [future tests...]
+├── README.md              # This file
+├── tests.h                # Master header — includes all test headers
+├── tests.c                # Master test runner — dispatches all test suites
+├── test_varargs.c/h       # Checkpoint 1: va_list system
+├── test_printf.c/h        # Checkpoint 2: kprintf format specifiers (10 groups)
+├── test_scroll_log.c/h    # Checkpoint 3: kernel log buffer (currently skipped)
+├── test_pmm.c/h           # Checkpoint 4: physical memory manager (15 tests)
+├── test_paging.c/h        # Checkpoint 5: paging subsystem (8 tests)
+├── test_ata.c/h           # Checkpoint 6: ATA PIO driver (5 tests)
+├── test_fs.c/h            # Checkpoint 7: SimpleFS filesystem (10 tests)
+└── test_template.c/h.example  # Template for new tests
 ```
+
+## Test Suites
+
+### Checkpoint 1: `test_varargs` — Variable Arguments
+Verifies `va_start`, `va_arg`, `va_end` with mixed types (string, int, string).
+
+### Checkpoint 2: `test_printf` — Formatted Output
+10 test groups covering every `kprintf` format specifier:
+`%d`, `%u`, `%x`, `%X`, `%c`, `%s`, `%p`, `%%`, mixed formats, edge cases.
+
+### Checkpoint 3: `test_klog` — Kernel Log *(skipped)*
+Tests the circular kernel log buffer and log levels. Currently disabled for debugging.
+
+### Checkpoint 4: `test_pmm` — Physical Memory Manager
+15 tests: single/multi/contiguous allocation, page alignment, memory accounting, free, double-free detection, unaligned address rejection, out-of-range rejection, zero-alloc, pool range validation, 50-cycle stress test.
+
+### Checkpoint 5: `test_paging` — Paging Subsystem
+8 tests: identity map verification (kernel, VGA, heap, PMM pool, boundary), unmapped address detection, dynamic map/unmap round-trip.
+
+### Checkpoint 6: `test_ata` — ATA PIO Driver
+5 tests: drive detection, IDENTIFY validation, LBA support check, boot sector signature read, 512-byte write/read round-trip.
+
+### Checkpoint 7: `test_fs` — SimpleFS Filesystem
+10 tests: file create, duplicate rejection, write, read+verify, stat, mkdir, directory listing, second file round-trip, delete+verify, nonexistent file error.
 
 ## Running Tests
 
-Tests are automatically run during kernel initialization before entering the main loop.
+Tests execute automatically when the kernel boots:
 
-To run tests:
-```bash
-make run
+```
+kernel_main()
+  → GDT, IDT, PIC, PIT, timer init
+  → kmalloc, PMM, paging init
+  → ATA, RAM disk, SimpleFS init
+  → keyboard, shell init
+  → interrupts enabled
+  → run_all_tests()          ← tests run here
+  → shell prompt
 ```
 
-Tests execute after all kernel subsystems are initialized:
-1. IDT initialization
-2. PIC remapping
-3. Heap initialization
-4. Keyboard initialization
-5. **→ TESTS RUN HERE ←**
-6. System ready (keyboard input loop)
+To run headless and inspect results:
+```bash
+make run-term
+# Output goes to stdout and last_run.log
+# Ctrl+A then X to exit QEMU
+```
+
+Count passes:
+```bash
+grep -c '\[PASS\]' last_run.log
+```
 
 ## Adding a New Test
 
-### Step 1: Create Test Files
+### 1. Create the files
 
-Create two files in `tests/`:
-- `test_yourfeature.h` - Header with function prototype
-- `test_yourfeature.c` - Implementation
-
-**Example: `test_yourfeature.h`**
+**`tests/test_feature.h`**
 ```c
-#ifndef TEST_YOURFEATURE_H
-#define TEST_YOURFEATURE_H
+#ifndef TEST_FEATURE_H
+#define TEST_FEATURE_H
 
-void test_yourfeature();
+void test_feature(void);
 
 #endif
 ```
 
-**Example: `test_yourfeature.c`**
+**`tests/test_feature.c`**
 ```c
 #include "../drivers/screen.h"
-#include "test_yourfeature.h"
+#include "test_feature.h"
 
-void test_yourfeature() {
-    kprint("\n=== Testing Your Feature ===\n");
-    
-    // Your test code here
-    // Use kprint() for output
-    // Check conditions and report
-    
-    kprint("  [PASS] Test completed\n");
+void test_feature(void) {
+    kprint("=== Testing Feature ===\n");
+
+    // Test 1
+    kprint("Test 1: Basic case...\n");
+    if (condition) {
+        kprint("  [PASS] Basic case\n");
+    } else {
+        kprint("  [FAIL] Basic case\n");
+    }
 }
 ```
 
-### Step 2: Register in Master Test Runner
+### 2. Register in the test runner
 
-**Edit `tests/tests.h`:**
+**`tests/tests.h`** — add the include:
 ```c
-#ifndef TESTS_H
-#define TESTS_H
-
-#include "test_varargs.h"
-#include "test_yourfeature.h"  // Add this line
-
-void run_all_tests();
-
-#endif
+#include "test_feature.h"
 ```
 
-**Edit `tests/tests.c`:**
+**`tests/tests.c`** — add the call with a checkpoint:
 ```c
-void run_all_tests() {
-    kprint("\n");
-    kprint("=====================================\n");
-    kprint("       RUNNING UNIT TESTS\n");
-    kprint("=====================================\n");
-    
-    // Run all tests
-    test_va_system();
-    test_yourfeature();  // Add this line
-    
-    kprint("=====================================\n");
-    kprint("       ALL TESTS COMPLETED\n");
-    kprint("=====================================\n");
-    kprint("\n");
-}
+kprint("\n>>> Starting test_feature...\n");
+test_feature();
+kprint(">>> CHECKPOINT N: test_feature COMPLETE\n");
 ```
 
-### Step 3: Build and Run
+### 3. Build and run
 
 ```bash
-make clean && make run
+make clean && make run-term
 ```
 
-The makefile automatically picks up all `.c` files in the `tests/` directory via wildcard patterns:
+The makefile auto-discovers all `.c` files via:
 ```makefile
-C_SOURCES = $(wildcard *.c */*.c)
+C_SOURCES = $(wildcard *.c */*.c */*/*.c)
 ```
+
+No makefile edits needed.
 
 ## Test Guidelines
 
-### ✅ DO:
-- Test one specific feature per test function
-- Use clear, descriptive test names
-- Print clear success/failure messages
-- Use `kprint()` for output
-- Test edge cases (NULL, zero, max values)
-- Keep tests simple and focused
-
-### ❌ DON'T:
-- Don't make tests depend on each other
-- Don't use infinite loops in tests
-- Don't allocate memory without freeing it (causes memory leaks)
-- Don't crash the kernel (use proper error checking)
-
-## Test Output Format
-
-Use a consistent format for test output:
-
-```c
-void test_something() {
-    kprint("\n=== Testing Something ===\n");
-    
-    // Test 1
-    kprint("Test 1: Basic functionality\n");
-    if (condition) {
-        kprint("  [PASS] Basic test passed\n");
-    } else {
-        kprint("  [FAIL] Basic test failed\n");
-    }
-    
-    // Test 2
-    kprint("Test 2: Edge cases\n");
-    if (edge_case_works) {
-        kprint("  [PASS] Edge case handled\n");
-    } else {
-        kprint("  [FAIL] Edge case failed\n");
-    }
-}
-```
-
-## Current Tests
-
-### test_varargs.c
-**Purpose:** Verify the variable arguments (va_list) system works correctly
-
-**What it tests:**
-- `va_start()` initialization
-- `va_arg()` for different types (string, int, string)
-- `va_end()` cleanup
-- Type promotion (char promoted to int)
-
-**Expected output:**
-```
-=== Testing va_list system ===
-First: Hello
-Second (int): 42
-Third (string): World
-```
-
-## Future Test Ideas
-
-- **test_kmalloc.c** - Heap allocator tests
-  - Allocate various sizes
-  - Free and coalesce
-  - Fragmentation scenarios
-  - Out-of-memory handling
-
-- **test_string.c** - String utility tests (when implemented)
-  - strlen(), strcmp(), strcpy()
-  - memset(), memcpy()
-  - Edge cases (NULL, empty strings)
-
-- **test_printf.c** - Printf implementation tests
-  - All format specifiers (%d, %u, %x, %s, %c, %p)
-  - Edge cases (NULL strings, negative numbers)
-  - Mixed format strings
-
-- **test_idt.c** - IDT/interrupt tests
-  - Verify IDT entries are set correctly
-  - Test specific interrupt handlers
-
-- **test_timer.c** - Timer tests (when PIT is implemented)
-  - Verify tick counting
-  - Uptime calculation
+- **One feature per test function** — keep tests focused and independent
+- **Use `[PASS]` / `[FAIL]` tags** — enables automated counting with `grep`
+- **Test edge cases** — NULL, zero, max values, invalid inputs
+- **No cross-test dependencies** — each test must work in isolation
+- **Clean up allocations** — free any pages or heap memory acquired during the test
+- **No infinite loops** — tests must terminate
 
 ## Disabling Tests
 
-To temporarily disable all tests, comment out the call in `kernel/kernel_main.c`:
-
+Disable all tests — comment out in `kernel/sys/kernel_main.c`:
 ```c
-// run_all_tests();  // Commented out
+// run_all_tests();
 ```
 
-To disable a specific test, comment it out in `tests/tests.c`:
-
+Disable one test — comment out its call in `tests/tests.c`:
 ```c
-void run_all_tests() {
-    // ...
-    test_va_system();
-    // test_yourfeature();  // Disabled
-    // ...
-}
+// test_feature();
 ```
 
 ## Debugging Failed Tests
 
-If a test causes the kernel to crash:
-
-1. **Check QEMU output** - Look for triple fault or exception messages
-2. **Use GDB** - `make debug` for step-by-step debugging
-3. **Add more kprint()** - Narrow down where the crash occurs
-4. **Check pointers** - NULL pointer dereferences are common
-5. **Verify memory** - Use `kmalloc_status()` to check for corruption
-
-## Automated Testing (Future)
-
-Future enhancements:
-- Test result tracking (pass/fail count)
-- Exit QEMU automatically after tests
-- Log output to file for CI/CD
-- Assert macros for easier testing
-- Mock/stub framework for unit isolation
-
----
-
-**Remember:** Tests are documentation! Write clear, readable tests that demonstrate how features should work.
+1. Check QEMU serial output for exception messages or triple faults
+2. Use `make debug` to step through with GDB
+3. Add `kprint()` calls to narrow down the failure point
+4. Use `kmalloc_status()` / `pmm_status()` to check for memory corruption
