@@ -341,7 +341,37 @@ int fs_delete(const char* name) {
         freed_blocks = (entry.size + BLOCK_SIZE - 1) / BLOCK_SIZE;
     }
 
-    /* Clear the entry */
+    /* If deleting a directory, also remove all children whose names
+     * start with "<dirname>/".  This handles the flat-namespace path
+     * convention used by SimpleFS v1. */
+    if (entry.type == FS_TYPE_DIR) {
+        uint32_t prefix_len = strlen(name);
+        for (uint32_t i = 0; i < FS_MAX_ENTRIES; i++) {
+            fs_entry_t child;
+            if (fs_read_entry(i, &child) != 0) continue;
+            if (child.type == FS_TYPE_FREE) continue;
+
+            /* Match "<name>/" prefix */
+            if (strncmp(child.name, name, prefix_len) == 0 &&
+                child.name[prefix_len] == '/') {
+                /* Accumulate freed data blocks */
+                if (child.type == FS_TYPE_FILE && child.size > 0) {
+                    freed_blocks += (child.size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+                }
+                /* Recurse for nested subdirectories */
+                if (child.type == FS_TYPE_DIR) {
+                    /* Wipe children of this sub-dir too (iterative: they
+                     * will also match our prefix so this loop covers them) */
+                }
+                /* Clear the child entry */
+                memset(&child, 0, sizeof(child));
+                child.type = FS_TYPE_FREE;
+                fs_write_entry(i, &child);
+            }
+        }
+    }
+
+    /* Clear the entry itself */
     memset(&entry, 0, sizeof(entry));
     entry.type = FS_TYPE_FREE;
     if (fs_write_entry(index, &entry) != 0) return -1;

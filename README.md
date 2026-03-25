@@ -178,11 +178,12 @@ ApPa/
 | 11 | File System & Disk I/O | `drivers/ata.c`, `fs/simplefs.c`, `fs/ramdisk.c` | ✅ Done |
 | 12 | Multitasking | `kernel/task/sched.c`, `task.c`, `switch.asm`, `kernel/arch/tss.c` | ✅ Done |
 | 13 | Userspace (Ring 3) | `kernel/arch/syscall.c`, `syscall_stub.asm`, `kernel/task/umode.asm`, `libc/syscall.c` | ✅ Done |
-| 14 | Per-Process Address Spaces | — | ⬜ Next |
+| 14 | Persistent FS (ATA-backed) | `fs/simplefs.c`, `drivers/ata_blockdev.c` | ⬜ Next |
+| 15 | Per-Process Address Spaces | — | ⬜ Planned |
 
 ### Future Directions
 
-- **Per-Process Address Spaces** — Private page directories, CR3 switching (Phase 14, planned)
+- **Per-Process Address Spaces** — Private page directories, CR3 switching (Phase 15, planned)
 - **ELF Loader** — Load and execute programs from disk
 - **Blocking I/O / IPC** — Sleep queues, pipes, message passing
 - **Networking** — NE2000 driver, basic TCP/IP stack

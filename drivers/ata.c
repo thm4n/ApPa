@@ -14,6 +14,7 @@
 
 /* Static drive info populated by ata_init / ata_identify */
 static ata_drive_info_t drive_info;
+static ata_drive_info_t slave_info;
 
 /* ========== Internal Helpers ========== */
 
@@ -93,13 +94,18 @@ static void ata_fix_identify_string(char* str, int len) {
     }
 }
 
-/* ========== Public API ========== */
+/* ========== Internal: Parameterized IDENTIFY ========== */
 
-void ata_init(void) {
-    memset(&drive_info, 0, sizeof(drive_info));
+/**
+ * ata_identify_drive - Run IDENTIFY DEVICE on a specific drive
+ * @drive_select: ATA_DRIVE_MASTER or ATA_DRIVE_SLAVE
+ * @info:         Output drive info struct (zeroed on failure)
+ */
+static void ata_identify_drive(uint8_t drive_select, ata_drive_info_t* info) {
+    memset(info, 0, sizeof(*info));
 
-    /* Select primary master drive */
-    port_byte_out(ATA_PRIMARY_DRIVE_HEAD, ATA_DRIVE_MASTER);
+    /* Select drive */
+    port_byte_out(ATA_PRIMARY_DRIVE_HEAD, drive_select);
     ata_400ns_delay();
 
     /* Zero out sector count and LBA registers */
@@ -115,8 +121,7 @@ void ata_init(void) {
     /* Check if drive exists */
     uint8_t status = port_byte_in(ATA_PRIMARY_STATUS);
     if (status == 0) {
-        /* No drive present */
-        drive_info.present = 0;
+        info->present = 0;
         return;
     }
 
@@ -127,8 +132,7 @@ void ata_init(void) {
     /* Check LBA_MID and LBA_HI — if non-zero, it's not ATA */
     if (port_byte_in(ATA_PRIMARY_LBA_MID) != 0 ||
         port_byte_in(ATA_PRIMARY_LBA_HI) != 0) {
-        /* Not an ATA device (might be ATAPI/SATA) */
-        drive_info.present = 0;
+        info->present = 0;
         return;
     }
 
@@ -136,7 +140,7 @@ void ata_init(void) {
     while (1) {
         status = port_byte_in(ATA_PRIMARY_STATUS);
         if (status & ATA_SR_ERR) {
-            drive_info.present = 0;
+            info->present = 0;
             return;
         }
         if (status & ATA_SR_DRQ)
@@ -148,46 +152,44 @@ void ata_init(void) {
     port_words_in(ATA_PRIMARY_DATA, identify_data, 256);
 
     /* Extract model string (words 27-46 = 40 bytes) */
-    memcpy(drive_info.model, &identify_data[27], 40);
-    ata_fix_identify_string(drive_info.model, 40);
+    memcpy(info->model, &identify_data[27], 40);
+    ata_fix_identify_string(info->model, 40);
 
     /* Extract total LBA28 sectors (words 60-61) */
-    drive_info.lba28_sectors = (uint32_t)identify_data[61] << 16 |
-                               (uint32_t)identify_data[60];
+    info->lba28_sectors = (uint32_t)identify_data[61] << 16 |
+                          (uint32_t)identify_data[60];
 
     /* Calculate size in MB */
-    drive_info.size_mb = drive_info.lba28_sectors / 2048;  /* sectors / (1MB/512) */
+    info->size_mb = info->lba28_sectors / 2048;
 
     /* Check LBA support (word 49, bit 9) */
-    drive_info.lba_supported = (identify_data[49] & (1 << 9)) ? 1 : 0;
+    info->lba_supported = (identify_data[49] & (1 << 9)) ? 1 : 0;
 
-    drive_info.present = 1;
+    info->present = 1;
 }
 
-int ata_read_sectors(uint32_t lba, uint8_t count, void* buf) {
-    if (!drive_info.present) return -1;
+/* ========== Internal: Parameterized Read/Write ========== */
+
+static int ata_read_sectors_internal(uint8_t drive_select,
+                                     const ata_drive_info_t* info,
+                                     uint32_t lba, uint8_t count, void* buf) {
+    if (!info->present) return -1;
 
     uint16_t* wbuf = (uint16_t*)buf;
 
     ata_wait_ready();
 
-    /* Select drive + LBA bits 24-27 */
     port_byte_out(ATA_PRIMARY_DRIVE_HEAD,
-                  ATA_DRIVE_MASTER | ((lba >> 24) & 0x0F));
+                  drive_select | ((lba >> 24) & 0x0F));
 
-    /* Sector count */
     port_byte_out(ATA_PRIMARY_SECCOUNT, count);
-
-    /* LBA low / mid / high */
     port_byte_out(ATA_PRIMARY_LBA_LO,  (uint8_t)(lba & 0xFF));
     port_byte_out(ATA_PRIMARY_LBA_MID, (uint8_t)((lba >> 8) & 0xFF));
     port_byte_out(ATA_PRIMARY_LBA_HI,  (uint8_t)((lba >> 16) & 0xFF));
 
-    /* Send READ SECTORS command */
     port_byte_out(ATA_PRIMARY_STATUS, ATA_CMD_READ_SECTORS);
 
-    /* Read each sector */
-    uint8_t sectors = count == 0 ? 255 : count;  /* 0 means 256, but limit to 255 for safety */
+    uint8_t sectors = count == 0 ? 255 : count;
     for (uint8_t i = 0; i < sectors; i++) {
         if (ata_poll() != 0) return -1;
         port_words_in(ATA_PRIMARY_DATA, wbuf, 256);
@@ -197,29 +199,26 @@ int ata_read_sectors(uint32_t lba, uint8_t count, void* buf) {
     return 0;
 }
 
-int ata_write_sectors(uint32_t lba, uint8_t count, const void* buf) {
-    if (!drive_info.present) return -1;
+static int ata_write_sectors_internal(uint8_t drive_select,
+                                      const ata_drive_info_t* info,
+                                      uint32_t lba, uint8_t count,
+                                      const void* buf) {
+    if (!info->present) return -1;
 
     const uint16_t* wbuf = (const uint16_t*)buf;
 
     ata_wait_ready();
 
-    /* Select drive + LBA bits 24-27 */
     port_byte_out(ATA_PRIMARY_DRIVE_HEAD,
-                  ATA_DRIVE_MASTER | ((lba >> 24) & 0x0F));
+                  drive_select | ((lba >> 24) & 0x0F));
 
-    /* Sector count */
     port_byte_out(ATA_PRIMARY_SECCOUNT, count);
-
-    /* LBA low / mid / high */
     port_byte_out(ATA_PRIMARY_LBA_LO,  (uint8_t)(lba & 0xFF));
     port_byte_out(ATA_PRIMARY_LBA_MID, (uint8_t)((lba >> 8) & 0xFF));
     port_byte_out(ATA_PRIMARY_LBA_HI,  (uint8_t)((lba >> 16) & 0xFF));
 
-    /* Send WRITE SECTORS command */
     port_byte_out(ATA_PRIMARY_STATUS, ATA_CMD_WRITE_SECTORS);
 
-    /* Write each sector */
     uint8_t sectors = count == 0 ? 255 : count;
     for (uint8_t i = 0; i < sectors; i++) {
         if (ata_poll() != 0) return -1;
@@ -227,34 +226,72 @@ int ata_write_sectors(uint32_t lba, uint8_t count, const void* buf) {
         wbuf += 256;
     }
 
-    /* Flush cache to ensure data is written */
     port_byte_out(ATA_PRIMARY_STATUS, ATA_CMD_CACHE_FLUSH);
     ata_wait_ready();
 
     return 0;
 }
 
+/* ========== Public API ========== */
+
+void ata_init(void) {
+    /* Probe primary master */
+    ata_identify_drive(ATA_DRIVE_MASTER, &drive_info);
+
+    /* Probe primary slave */
+    ata_identify_drive(ATA_DRIVE_SLAVE, &slave_info);
+}
+
+int ata_read_sectors(uint32_t lba, uint8_t count, void* buf) {
+    return ata_read_sectors_internal(ATA_DRIVE_MASTER, &drive_info,
+                                    lba, count, buf);
+}
+
+int ata_write_sectors(uint32_t lba, uint8_t count, const void* buf) {
+    return ata_write_sectors_internal(ATA_DRIVE_MASTER, &drive_info,
+                                     lba, count, buf);
+}
+
+int ata_slave_read_sectors(uint32_t lba, uint8_t count, void* buf) {
+    return ata_read_sectors_internal(ATA_DRIVE_SLAVE, &slave_info,
+                                    lba, count, buf);
+}
+
+int ata_slave_write_sectors(uint32_t lba, uint8_t count, const void* buf) {
+    return ata_write_sectors_internal(ATA_DRIVE_SLAVE, &slave_info,
+                                     lba, count, buf);
+}
+
 const ata_drive_info_t* ata_get_info(void) {
     return &drive_info;
 }
 
-void ata_status(void) {
-    if (!drive_info.present) {
-        kprint("ATA Primary Master: Not detected\n");
+const ata_drive_info_t* ata_get_slave_info(void) {
+    return &slave_info;
+}
+
+static void ata_print_drive(const char* label, const ata_drive_info_t* info) {
+    kprint((char*)label);
+    if (!info->present) {
+        kprint("Not detected\n");
         return;
     }
-
-    kprint("ATA Primary Master:\n");
+    kprint("\n");
     kprint("  Model:    ");
-    kprint(drive_info.model);
+    kprint((char*)info->model);
     kprint("\n");
     kprint("  Sectors:  ");
-    kprint_uint(drive_info.lba28_sectors);
+    kprint_uint(info->lba28_sectors);
     kprint("\n");
     kprint("  Size:     ");
-    kprint_uint(drive_info.size_mb);
+    kprint_uint(info->size_mb);
     kprint(" MB\n");
     kprint("  LBA:      ");
-    kprint(drive_info.lba_supported ? "Supported" : "Not supported");
+    kprint(info->lba_supported ? "Supported" : "Not supported");
     kprint("\n");
+}
+
+void ata_status(void) {
+    ata_print_drive("ATA Primary Master: ", &drive_info);
+    ata_print_drive("ATA Primary Slave:  ", &slave_info);
 }

@@ -46,4 +46,15 @@ void klog_clear();
 // Get a specific log entry (for reading back)
 klog_entry_t* klog_get_entry(uint32_t index);
 
+/**
+ * klog_flush_to_file - Write all buffered log entries to a file
+ * @filename: Target filename on the mounted filesystem (e.g. "klog.txt")
+ *
+ * Formats each entry as: "[LEVEL] <timestamp> <message>\n"
+ * Creates the file if needed, then overwrites its contents.
+ *
+ * Returns: 0 on success, -1 on error
+ */
+int klog_flush_to_file(const char* filename);
+
 #endif

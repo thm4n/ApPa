@@ -449,9 +449,9 @@ Hello from Ring 3!
 --- Userspace tests complete ---
 ```
 
-### Known Limitations (Addressed in Phase 14)
+### Known Limitations (Addressed in Phase 15)
 
-- **No memory isolation** — `paging_enable_user_access()` marks the entire 0-16 MB identity map as user-accessible. Any Ring 3 task can read/write kernel data. Phase 14 introduces per-process page directories.
+- **No memory isolation** — `paging_enable_user_access()` marks the entire 0-16 MB identity map as user-accessible. Any Ring 3 task can read/write kernel data. Phase 15 introduces per-process page directories.
 - **User code in kernel binary** — User task functions are compiled into the kernel. A future ELF loader phase will load user programs from disk.
 - **SYS_READ stub** — Returns 0 (no data). Full keyboard ring-buffer integration is future work.
 - **SYS_SLEEP busy-yields** — Uses a yield loop instead of proper BLOCKED state + wakeup. Proper sleep queues are future work.

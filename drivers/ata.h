@@ -40,6 +40,10 @@
 #define ATA_DRIVE_MASTER        0xE0    /* Master drive, LBA mode */
 #define ATA_DRIVE_SLAVE         0xF0    /* Slave drive, LBA mode */
 
+/* ========== Device Indices ========== */
+#define ATA_DEV_MASTER          0
+#define ATA_DEV_SLAVE           1
+
 /* ========== Sector Size ========== */
 #define ATA_SECTOR_SIZE         512
 
@@ -81,11 +85,38 @@ int ata_read_sectors(uint32_t lba, uint8_t count, void* buf);
 int ata_write_sectors(uint32_t lba, uint8_t count, const void* buf);
 
 /**
- * ata_get_info - Get drive information from last IDENTIFY
+ * ata_get_info - Get master drive information from last IDENTIFY
  * 
  * Returns: Pointer to static ata_drive_info_t struct
  */
 const ata_drive_info_t* ata_get_info(void);
+
+/**
+ * ata_get_slave_info - Get slave drive information from last IDENTIFY
+ * 
+ * Returns: Pointer to static ata_drive_info_t struct
+ */
+const ata_drive_info_t* ata_get_slave_info(void);
+
+/**
+ * ata_slave_read_sectors - Read sectors from slave drive using PIO
+ * @lba:   Starting LBA sector number
+ * @count: Number of sectors to read (1-255)
+ * @buf:   Destination buffer (must be at least count * 512 bytes)
+ * 
+ * Returns: 0 on success, -1 on error
+ */
+int ata_slave_read_sectors(uint32_t lba, uint8_t count, void* buf);
+
+/**
+ * ata_slave_write_sectors - Write sectors to slave drive using PIO
+ * @lba:   Starting LBA sector number
+ * @count: Number of sectors to write (1-255)
+ * @buf:   Source buffer (must be at least count * 512 bytes)
+ * 
+ * Returns: 0 on success, -1 on error
+ */
+int ata_slave_write_sectors(uint32_t lba, uint8_t count, const void* buf);
 
 /**
  * ata_status - Print drive info to screen (for shell 'disk' command)

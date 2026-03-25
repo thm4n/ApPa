@@ -88,8 +88,42 @@ N_ASM_SRC := $(words $(KERNEL_ASM_SOURCES))
 
 # =======================================
 
-# Default target
-all: build
+# Default target — show available commands
+all: help
+
+# ========== Help ==========
+help:
+	@printf "\n$(CLR_BLD)  ApPa OS$(CLR_RST)$(CLR_DIM)  ──  i686 bare-metal kernel$(CLR_RST)\n"
+	@printf "$(CLR_DIM)  ─────────────────────────────────────────$(CLR_RST)\n"
+	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make build"       "Compile kernel + assemble disk image"
+	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make run"         "Build & launch QEMU (graphical window)"
+	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make run-term"    "Build & launch QEMU (curses terminal)"
+	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make run-log"     "Build & launch QEMU (serial → stdout)"
+	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make debug"       "Build & launch QEMU + GDB session"
+	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make clean"       "Remove build artifacts (keeps disk.img)"
+	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make disk-reset"  "Delete persistent disk image"
+	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make mem_show"    "Show memory layout of last built image"
+	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make mem_img_show" "Inspect SimpleFS disk image contents"
+	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make check"       "List all C source files"
+	@printf "\n"
+	@printf "  $(CLR_DIM)Options:  V=1          verbose mode (shows raw commands)$(CLR_RST)\n"
+	@printf "  $(CLR_DIM)          IMG=<path>   disk image for mem_img_show (default: bin/disk.img)$(CLR_RST)\n"
+	@printf "\n"
+
+# ========== Persistent Disk Image ==========
+# SimpleFS lives on a separate ATA slave disk (QEMU -hdb).
+# Created once; survives 'make clean' so data persists across builds.
+DISK_IMG = $(BIN_DIR)/disk.img
+DISK_SIZE = 4M
+
+$(DISK_IMG): | $(BIN_DIR)
+	$(call log,DISK,Creating $(DISK_SIZE) persistent disk image)
+	$(Q)qemu-img create -f raw $(DISK_IMG) $(DISK_SIZE) >/dev/null 2>&1
+
+# Convenience target to wipe the filesystem and start fresh
+disk-reset:
+	$(call log,DISK,Deleting disk image (will be recreated on next run))
+	@rm -f $(DISK_IMG)
 
 # Build only (no QEMU)
 build: _build_banner $(BIN_DIR)/image.bin _build_done
@@ -150,30 +184,33 @@ $(BIN_DIR)/kernel.elf: boot/kernel_entry.o ${OBJ} ${KERNEL_ASM_OBJ} | $(BIN_DIR)
 	$(call log,LD,kernel.elf  ($(words $^) objects))
 	$(Q)${LD} ${LDFLAGS} -o $@ -Ttext 0x1000 $^
 
+# Persistent disk: -drive index=1 maps to primary slave (same I/O ports, different drive select)
+QEMU_DISK = -drive file=$(DISK_IMG),format=raw,index=1
+
 # Run QEMU with graphical display window
-run-graphics: $(BIN_DIR)/image.bin
-	$(call log,QEMU,graphics mode)
-	@qemu-system-i386 -s -drive file=$<,format=raw
+run-graphics: $(BIN_DIR)/image.bin $(DISK_IMG)
+	$(call log,QEMU,graphics mode (with persistent disk))
+	@qemu-system-i386 -s -drive file=$<,format=raw $(QEMU_DISK)
 
 # Run QEMU with curses display (terminal-based VGA with PS/2 keyboard)
-run-term: $(BIN_DIR)/image.bin
-	$(call log,QEMU,terminal curses mode)
+run-term: $(BIN_DIR)/image.bin $(DISK_IMG)
+	$(call log,QEMU,terminal curses mode (with persistent disk))
 	@printf "  $(CLR_DIM)%-8s ESC+2 for monitor | Ctrl+A X to exit$(CLR_RST)\n" ""
-	@qemu-system-i386 -s -drive file=$<,format=raw -display curses
+	@qemu-system-i386 -s -drive file=$<,format=raw $(QEMU_DISK) -display curses
 
 # Run QEMU with serial output tee'd to stdout (no keyboard input)
-run-log: $(BIN_DIR)/image.bin
-	$(call log,QEMU,serial logging mode)
+run-log: $(BIN_DIR)/image.bin $(DISK_IMG)
+	$(call log,QEMU,serial logging mode (with persistent disk))
 	@printf "  $(CLR_DIM)%-8s Output: stdout + last_run.log | Ctrl+A X to exit$(CLR_RST)\n" ""
 	@rm -f last_run.log
-	@qemu-system-i386 -s -drive file=$<,format=raw -serial mon:stdio -nographic 2>&1 | tee last_run.log
+	@qemu-system-i386 -s -drive file=$<,format=raw $(QEMU_DISK) -serial mon:stdio -nographic 2>&1 | tee last_run.log
 
 # Aliases for convenience
 run: run-graphics
 
-debug: $(BIN_DIR)/image.bin $(BIN_DIR)/kernel.elf
+debug: $(BIN_DIR)/image.bin $(BIN_DIR)/kernel.elf $(DISK_IMG)
 	$(call log,DEBUG,Launching QEMU + GDB session)
-	@qemu-system-i386 -s -drive file=$<,format=raw &
+	@qemu-system-i386 -s -drive file=$<,format=raw $(QEMU_DISK) &
 	@printf "  $(CLR_DIM)%-8s Connecting GDB to localhost:1234$(CLR_RST)\n" ""
 	@${GDB} -ex "target remote localhost:1234" -ex "symbol-file $(BIN_DIR)/kernel.elf"
 
@@ -192,10 +229,74 @@ $(BIN_DIR)/%.bin: boot/%.asm | $(BIN_DIR)
 clean:
 	@printf "\n$(CLR_BLD)  ApPa OS$(CLR_RST)$(CLR_DIM)  ──  clean$(CLR_RST)\n"
 	@printf "$(CLR_DIM)  ─────────────────────────────────────────$(CLR_RST)\n"
-	$(call log,CLEAN,bin/*)
-	@rm -rf $(BIN_DIR)/*
+	$(call log,CLEAN,bin/* (preserving disk.img))
+	@find $(BIN_DIR) -maxdepth 1 -type f ! -name 'disk.img' -exec rm -f {} + 2>/dev/null || true
 	$(call log,CLEAN,*.o)
 	@rm -f $(wildcard *.o */*.o */*/*.o)
 	@printf "  $(CLR_GRN)%-8s$(CLR_RST) All build artifacts removed\n\n" "[DONE]"
 
-.PHONY: all build run run-graphics run-term run-log debug clean check _build_banner _build_done
+# ========== Memory Layout Inspector ==========
+mem_show: $(BIN_DIR)/kernel.elf
+	@printf "\n$(CLR_BLD)  ApPa OS$(CLR_RST)$(CLR_DIM)  ──  Memory Layout$(CLR_RST)\n"
+	@printf "$(CLR_DIM)  ─────────────────────────────────────────$(CLR_RST)\n"
+	@printf "\n  $(CLR_BLD)Build Configuration$(CLR_RST)\n"
+	@printf "  $(CLR_DIM)%-24s$(CLR_RST) %s\n" "KERNEL_OFFSET"   "$(KERNEL_OFFSET)"
+	@printf "  $(CLR_DIM)%-24s$(CLR_RST) %s\n" "STACK_BASE"      "$(STACK_BASE)"
+	@printf "  $(CLR_DIM)%-24s$(CLR_RST) %s\n" "REAL_MODE_STACK"  "$(REAL_MODE_STACK)"
+	@printf "\n  $(CLR_BLD)Image Sizes$(CLR_RST)\n"
+	@BOOT=$$(stat -c%s $(BIN_DIR)/boot_sector.bin 2>/dev/null || echo '?'); \
+	 STG2=$$(stat -c%s $(BIN_DIR)/stage2.bin 2>/dev/null || echo '?'); \
+	 KERN=$$(stat -c%s $(BIN_DIR)/kernel.bin 2>/dev/null || echo '?'); \
+	 IMG=$$(stat -c%s $(BIN_DIR)/image.bin 2>/dev/null || echo '?'); \
+	 KSEC=$$(( ($$KERN + 511) / 512 )); \
+	 printf "  $(CLR_DIM)%-24s$(CLR_RST) %s bytes\n" "boot_sector.bin" "$$BOOT"; \
+	 printf "  $(CLR_DIM)%-24s$(CLR_RST) %s bytes\n" "stage2.bin"      "$$STG2"; \
+	 printf "  $(CLR_DIM)%-24s$(CLR_RST) %s bytes  (%s sectors)\n" "kernel.bin" "$$KERN" "$$KSEC"; \
+	 printf "  $(CLR_DIM)%-24s$(CLR_RST) %s bytes\n" "image.bin"       "$$IMG"
+	@printf "\n  $(CLR_BLD)Physical Memory Map$(CLR_RST)\n"
+	@KERN_SIZE=$$(stat -c%s $(BIN_DIR)/kernel.bin 2>/dev/null || echo 0); \
+	 KERN_END=$$(printf "0x%05X" $$(($(KERNEL_OFFSET) + $$KERN_SIZE))); \
+	 STACK_KB=$$(( ($(STACK_BASE) - $(KERNEL_OFFSET) - $$KERN_SIZE) / 1024 )); \
+	 printf "  $(CLR_DIM)0x00000000 - 0x000003FF$(CLR_RST)  IVT\n"; \
+	 printf "  $(CLR_DIM)0x00000400 - 0x000007FF$(CLR_RST)  BIOS Data Area\n"; \
+	 printf "  $(CLR_DIM)0x00000600 - 0x000007FF$(CLR_RST)  Stage 2 bootloader\n"; \
+	 printf "  $(CLR_CYN)%-23s$(CLR_RST)  Kernel code (%s bytes)\n" "$(KERNEL_OFFSET) - $$KERN_END" "$$KERN_SIZE"; \
+	 printf "  $(CLR_DIM)%-23s$(CLR_RST)  Free / Stack (~%s KB)\n" "$$KERN_END - $(STACK_BASE)" "$$STACK_KB"; \
+	 printf "  $(CLR_DIM)0x000A0000 - 0x000BFFFF$(CLR_RST)  VGA Video Memory\n"; \
+	 printf "  $(CLR_DIM)0x000C0000 - 0x000FFFFF$(CLR_RST)  BIOS ROM\n"; \
+	 printf "  $(CLR_DIM)0x00100000 - 0x001FFFFF$(CLR_RST)  Kernel heap (kmalloc)\n"; \
+	 printf "  $(CLR_DIM)0x00200000 - 0x00FFFFFF$(CLR_RST)  PMM page pool (identity mapped)\n"
+	@printf "\n  $(CLR_BLD)ELF Sections$(CLR_RST)\n"
+	@$(CROSS_COMPILER_BINS)objdump -h $(BIN_DIR)/kernel.elf 2>/dev/null | \
+	 awk '/^[[:space:]]+[0-9]+/{printf "  %-16s  VMA: %s  Size: %s\n", $$2, $$4, $$3}'
+	@printf "\n  $(CLR_BLD)Top 15 Symbols by Size$(CLR_RST)\n"
+	@$(CROSS_COMPILER_BINS)nm --size-sort -r $(BIN_DIR)/kernel.elf 2>/dev/null | \
+	 head -15 | awk '{ \
+	   sz=strtonum("0x" $$1); \
+	   sec=($$2=="T"||$$2=="t"?"code":$$2=="B"||$$2=="b"?"bss":$$2=="D"||$$2=="d"?"data":$$2); \
+	   printf "  %6d B  %-24s  (%s)\n", sz, $$3, sec \
+	 }'
+	@if [ -f $(DISK_IMG) ]; then \
+	 DSIZE=$$(stat -c%s $(DISK_IMG)); \
+	 DSEC=$$(($$DSIZE / 512)); \
+	 printf "\n  $(CLR_BLD)Persistent Disk$(CLR_RST)\n"; \
+	 printf "  $(CLR_DIM)%-24s$(CLR_RST) %s bytes  (%s sectors)\n" "disk.img" "$$DSIZE" "$$DSEC"; \
+	 MAGIC=$$(dd if=$(DISK_IMG) bs=4 count=1 2>/dev/null | od -An -tx4 | tr -d ' '); \
+	 if [ "$$MAGIC" = "41504653" ]; then \
+	   printf "  $(CLR_DIM)%-24s$(CLR_RST) $(CLR_GRN)SimpleFS formatted$(CLR_RST)\n" "Status"; \
+	 else \
+	   printf "  $(CLR_DIM)%-24s$(CLR_RST) $(CLR_YLW)Unformatted$(CLR_RST)\n" "Status"; \
+	 fi; \
+	else \
+	 printf "\n  $(CLR_DIM)No persistent disk image found$(CLR_RST)\n"; \
+	fi
+	@printf "\n"
+
+# ========== SimpleFS Image Inspector ==========
+# Usage: make mem_img_show  OR  make mem_img_show IMG=path/to/disk.img
+IMG ?= $(DISK_IMG)
+
+mem_img_show:
+	@python3 tools/simplefs_inspect.py $(IMG)
+
+.PHONY: all help build run run-graphics run-term run-log debug clean check disk-reset mem_show mem_img_show _build_banner _build_done

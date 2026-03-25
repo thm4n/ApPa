@@ -9,6 +9,7 @@
 #include "../mem/pmm.h"
 #include "../mem/paging.h"
 #include "../../drivers/ata.h"
+#include "../../drivers/ata_blockdev.h"
 #include "../../fs/ramdisk.h"
 #include "../../fs/simplefs.h"
 #include "../../drivers/keyboard.h"
@@ -81,35 +82,53 @@ void main() {
 
 	// Phase 4.75: Initialize kernel logging system
 	// Sets up circular buffer for persistent kernel logs
-	//klog_init();  // DISABLED FOR DEBUGGING
-	kprint("  [OK] Kernel logging initialized (DISABLED FOR DEBUG)\n");
-	//klog_info("ApPa Kernel v0.1 booting...");
-	//klog_info("Memory, IDT, and PIC configured");
+	klog_init();
+	kprint("  [OK] Kernel logging initialized\n");
+	klog_info("ApPa Kernel v0.1 booting...");
 
 	// Phase 4.8: Initialize ATA disk driver
-	// Detect primary master drive and read IDENTIFY data
+	// Detect primary master (boot image) and primary slave (data disk)
 	ata_init();
-	const ata_drive_info_t* disk = ata_get_info();
-	if (disk->present) {
-		kprint("  [OK] ATA disk detected: ");
-		kprint((char*)disk->model);
+	const ata_drive_info_t* master_disk = ata_get_info();
+	if (master_disk->present) {
+		kprint("  [OK] ATA master: ");
+		kprint((char*)master_disk->model);
 		kprint("\n");
 	} else {
-		kprint("  [--] No ATA disk detected\n");
+		kprint("  [--] No ATA master detected\n");
+	}
+	const ata_drive_info_t* slave_disk = ata_get_slave_info();
+	if (slave_disk->present) {
+		kprint("  [OK] ATA slave:  ");
+		kprint((char*)slave_disk->model);
+		kprint("\n");
+	} else {
+		kprint("  [--] No ATA slave detected\n");
 	}
 
-	// Phase 4.9: Initialize RAM disk and filesystem
-	// Create a 256KB RAM disk and format it with SimpleFS
-	block_device_t* ramdisk = ramdisk_init(256);
-	if (ramdisk) {
-		kprint("  [OK] RAM disk initialized (256 KB)\n");
-		if (fs_init(ramdisk) == 0) {
+	// Phase 14: Initialize filesystem on ATA slave (persistent) with
+	// ramdisk fallback when no slave disk is present (e.g. no -hdb)
+	block_device_t* blkdev = ata_blockdev_init();
+	if (blkdev) {
+		kprint("  [OK] ATA block device initialized (persistent)\n");
+		klog_info("FS: using ATA slave (persistent)");
+	} else {
+		kprint("  [--] No ATA slave — falling back to RAM disk\n");
+		blkdev = ramdisk_init(256);
+		if (blkdev) {
+			kprint("  [OK] RAM disk initialized (256 KB, volatile)\n");
+			klog_info("FS: using RAM disk (volatile)");
+		} else {
+			kprint("  [FAIL] RAM disk init failed\n");
+		}
+	}
+	if (blkdev) {
+		if (fs_init(blkdev) == 0) {
 			kprint("  [OK] SimpleFS mounted\n");
+			klog_info("SimpleFS mounted");
 		} else {
 			kprint("  [FAIL] SimpleFS init failed\n");
 		}
-	} else {
-		kprint("  [FAIL] RAM disk init failed\n");
 	}
 
 	// Phase 5: Initialize keyboard driver

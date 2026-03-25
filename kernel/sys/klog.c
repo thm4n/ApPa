@@ -3,6 +3,7 @@
 #include "../../libc/stdarg.h"
 #include "../../libc/string.h"
 #include "../../drivers/screen.h"
+#include "../../fs/simplefs.h"
 
 // Circular buffer for log entries
 static klog_entry_t log_buffer[KLOG_BUFFER_SIZE];
@@ -200,4 +201,68 @@ klog_entry_t* klog_get_entry(uint32_t index) {
     
     uint32_t actual_index = (start_pos + index) % KLOG_BUFFER_SIZE;
     return &log_buffer[actual_index];
+}
+
+int klog_flush_to_file(const char* filename) {
+    if (!filename) return -1;
+
+    uint32_t total, size;
+    klog_get_stats(&total, &size);
+    if (size == 0) return 0;  /* Nothing to flush */
+
+    /* Build the entire log as a single text blob.
+     * Max per line: "[ERROR] " (8) + timestamp ~10 + " " + msg 128 + "\n" ≈ 150
+     * Worst case: 256 entries × 150 = 38400 bytes.
+     * We use a 4 KB static buffer and flush in chunks. */
+    #define FLUSH_BUF_SIZE 4096
+    static char flush_buf[FLUSH_BUF_SIZE];
+    uint32_t pos = 0;
+
+    /* Determine start position (oldest entry in ring buffer) */
+    uint32_t start_pos;
+    if (log_count <= KLOG_BUFFER_SIZE) {
+        start_pos = 0;
+    } else {
+        start_pos = log_head;
+    }
+
+    /* First pass: build complete output in flush_buf.
+     * If it overflows, truncate (acceptable for v1). */
+    for (uint32_t i = 0; i < size && pos < FLUSH_BUF_SIZE - 2; i++) {
+        uint32_t idx = (start_pos + i) % KLOG_BUFFER_SIZE;
+        klog_entry_t* entry = &log_buffer[idx];
+
+        /* "[LEVEL] " */
+        const char* lvl = level_names[entry->level];
+        for (int j = 0; lvl[j] && pos < FLUSH_BUF_SIZE - 2; j++)
+            flush_buf[pos++] = lvl[j];
+        if (pos < FLUSH_BUF_SIZE - 2) flush_buf[pos++] = ' ';
+
+        /* Timestamp as decimal */
+        char ts_buf[16];
+        utoa(entry->timestamp, ts_buf, 10);
+        for (int j = 0; ts_buf[j] && pos < FLUSH_BUF_SIZE - 2; j++)
+            flush_buf[pos++] = ts_buf[j];
+        if (pos < FLUSH_BUF_SIZE - 2) flush_buf[pos++] = ' ';
+
+        /* Message */
+        for (int j = 0; entry->message[j] && pos < FLUSH_BUF_SIZE - 2; j++)
+            flush_buf[pos++] = entry->message[j];
+
+        /* Newline */
+        if (pos < FLUSH_BUF_SIZE - 1) flush_buf[pos++] = '\n';
+    }
+    flush_buf[pos] = '\0';
+
+    /* Ensure file exists */
+    fs_entry_t stat;
+    if (fs_stat(filename, &stat) != 0) {
+        if (fs_create(filename, FS_TYPE_FILE) != 0) return -1;
+    }
+
+    /* Write the log data */
+    if (fs_write_file(filename, flush_buf, pos) != 0) return -1;
+
+    return 0;
+    #undef FLUSH_BUF_SIZE
 }
