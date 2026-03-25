@@ -138,16 +138,20 @@ Stack of a newly created task (grows downward):
 
   High address (esp0 = stack base + 4096)
   ┌──────────────────────────────────────┐
-  │  (uint32_t) task_wrapper   ← 'ret' will jump here     │
-  │  (uint32_t) 0              ← fake ebp                  │
-  │  (uint32_t) 0              ← fake edi                  │
-  │  (uint32_t) 0              ← fake esi                  │
-  │  (uint32_t) entry_fn       ← fake ebx (real entry ptr) │
+  │  (uint32_t) entry_fn       ← cdecl arg1 for task_wrapper  │
+  │  (uint32_t) 0              ← fake return address (unused)  │
+  │  (uint32_t) task_wrapper   ← 'ret' will jump here          │
+  │  (uint32_t) 0              ← fake ebx                      │
+  │  (uint32_t) 0              ← fake esi                      │
+  │  (uint32_t) 0              ← fake edi                      │
+  │  (uint32_t) 0              ← fake ebp                      │
   └──────────────────────────────────────┘
   Low address (esp saved in TCB points here)
 ```
 
-When the scheduler first switches to this task, `task_switch` pops EBP/EDI/ESI/EBX and `ret`s into `task_wrapper()`. The wrapper reads the entry function address from EBX and calls it. If the entry function ever returns, the wrapper calls `task_exit()` to clean up.
+When the scheduler first switches to this task, `task_switch` pops EBP/EDI/ESI/EBX and `ret`s into `task_wrapper(entry_fn)`. The entry function address is passed as a standard cdecl parameter on the stack — this avoids relying on a specific register (EBX) surviving the switch, which is more portable and easier to reason about.
+
+`task_wrapper` enables interrupts (`sti`) because the context switch that delivered control here occurred inside a timer ISR with IF=0. Without this, the new task would run with interrupts permanently masked. After calling the entry function, the wrapper calls `task_exit()` to clean up.
 
 ---
 
@@ -180,6 +184,9 @@ When the scheduler first switches to this task, `task_switch` pops EBP/EDI/ESI/E
 
 #### `kernel/sys/timer.c` — Scheduler hook point
 The timer IRQ handler is the natural place to invoke `schedule()` for preemptive switching. After incrementing the tick counter, it calls `schedule()` which either decrements the time-slice counter and returns, or performs a full context switch.
+
+#### `kernel/arch/irq.c` — EOI ordering fix
+The End-Of-Interrupt (EOI) signal is now sent to the PIC **before** the handler runs, not after. This is critical because the timer handler can perform a context switch (`schedule()` → `task_switch()`), which means control may never return to the code *after* `interrupt_handlers[...]()`. If EOI is deferred until after the handler, and a context switch occurs, the PIC never un-masks the timer line — freezing all future timer interrupts. Sending EOI first is safe because interrupts are already disabled (IF=0) throughout the ISR stub.
 
 ### New Files
 
@@ -239,7 +246,7 @@ The state machine:
 #### `kernel/task/task.c` — Task lifecycle management
 - **Static pool allocator:** 64 TCB slots in a fixed array, avoiding a circular dependency on `kmalloc` (which itself will eventually need lock protection from the scheduler).
 - **`task_create(entry, name)`:** Allocates a TCB slot, grabs a 4 KB page from the PMM for the kernel stack, builds the fake context frame, and inserts the task into the ready queue.
-- **`task_wrapper()`:** Trampoline function that extracts the real entry point from EBX, calls it, and catches the return with `task_exit()`.
+- **`task_wrapper(entry_addr)`:** Trampoline function that receives the entry point as a cdecl parameter, enables interrupts (`sti`), calls the entry, and catches the return with `task_exit()`.
 - **`task_exit()`:** Marks the current task DEAD and yields — the task never resumes.
 - **`task_reap()`:** Scans the pool for DEAD tasks, frees their kernel stack pages back to the PMM, and zeroes the TCB slot for reuse.
 
@@ -365,6 +372,7 @@ Key additions:
 | `schedule()` | Core scheduler decision; called from timer ISR. |
 | `sched_get_current()` | Return the currently running task. |
 | `sched_is_enabled()` | Returns 1 if preemptive scheduling is active. |
+| `sched_remove_task(task)` | Unlink a DEAD task from the circular ready queue (called by `task_reap()`). |
 
 ### GDT Extensions (`kernel/arch/gdt.h`)
 
@@ -396,3 +404,7 @@ Key additions:
 | `kernel/task/switch.asm` | **New** | Low-level context switch (15 instructions) |
 | `kernel/sys/timer.c` | Modified | Calls `schedule()` from IRQ0 handler |
 | `kernel/sys/kernel_main.c` | Modified | Adds `tss_init()`, `sched_init()`, `sched_enable()` to boot sequence |
+| `kernel/arch/irq.c` | Modified | EOI sent before handler to survive context switches |
+| `shell/shell.c` | Modified | Added `tasktest` command for post-boot multitasking tests |
+| `tests/test_multitask.c/h` | **New** | 6 multitasking tests (creation, context switch, preemption, interleaving, reap, 3-concurrent) |
+| `makefile` | Modified | `kernel/task/*.asm` in build, `run-term` uses curses, `run-log` for serial |
