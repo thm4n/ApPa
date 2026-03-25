@@ -11,7 +11,7 @@ HEADERS = $(wildcard *.h */*.h */*/*.h)
 OBJ = ${C_SOURCES:.c=.o}
 
 # Kernel assembly sources (not boot sector)
-KERNEL_ASM_SOURCES = $(wildcard kernel/arch/*.asm)
+KERNEL_ASM_SOURCES = $(wildcard kernel/arch/*.asm) $(wildcard kernel/task/*.asm)
 KERNEL_ASM_OBJ = ${KERNEL_ASM_SOURCES:.asm=.o}
 
 BIN_DIR = bin

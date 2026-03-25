@@ -7,6 +7,7 @@
 
 #include "timer.h"
 #include "../arch/isr.h"
+#include "../task/sched.h"
 #include "../../libc/string.h"
 
 // Timer configuration
@@ -27,6 +28,11 @@ static void timer_handler(registers_t *regs) {
 	(void)regs;
 	
 	timer_ticks++;
+
+	// Call the scheduler for preemptive multitasking
+	// schedule() checks if scheduling is enabled and if the
+	// current task's time-slice has expired before switching
+	schedule();
 }
 
 /**

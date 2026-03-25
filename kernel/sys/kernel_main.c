@@ -4,6 +4,7 @@
 #include "../arch/idt.h"
 #include "../arch/pic.h"
 #include "../arch/pit.h"
+#include "../arch/tss.h"
 #include "timer.h"
 #include "../mem/pmm.h"
 #include "../mem/paging.h"
@@ -13,6 +14,8 @@
 #include "../../drivers/keyboard.h"
 #include "../mem/kmalloc.h"
 #include "klog.h"
+#include "../task/task.h"
+#include "../task/sched.h"
 #include "../../shell/shell.h"
 #include "../../tests/tests.h"
 
@@ -69,6 +72,12 @@ void main() {
 	paging_init();
 	kprint("  [OK] Paging enabled (identity map 0-16MB)\n");
 
+	// Phase 4.6: Initialize Task State Segment
+	// Installs TSS in GDT entry 5 so the CPU knows where the
+	// kernel stack is during privilege transitions and context switches
+	tss_init(0x10, 0x9FC00);
+	kprint("  [OK] TSS initialized\n");
+
 	// Phase 4.75: Initialize kernel logging system
 	// Sets up circular buffer for persistent kernel logs
 	//klog_init();  // DISABLED FOR DEBUGGING
@@ -112,6 +121,11 @@ void main() {
 	shell_init();
 	kprint("  [OK] Shell initialized\n");
 
+	// Phase 12: Initialize scheduler
+	// Wraps the current execution context as the bootstrap/idle task
+	sched_init();
+	kprint("  [OK] Scheduler initialized\n");
+
 	// Phase 7: Enable interrupts globally
 	// The STI (Set Interrupt Flag) instruction allows the CPU to
 	// respond to hardware interrupts
@@ -121,19 +135,22 @@ void main() {
 	// Run unit tests before entering shell
 	run_all_tests();
 	
+	// Phase 12: Enable preemptive scheduling
+	// From this point, the timer ISR will call schedule() and
+	// switch between tasks when time-slices expire
+	sched_enable();
+	kprint("  [OK] Preemptive scheduling enabled\n");
+
 	kprint("=== ApPa OS Ready ===\n");
-	kprint("Timer ticking in top-right corner (0-9 = IRQ0 working)\n");
 	kprint("Type 'help' for available commands\n\n");
 	kprint("> ");
 
-	// Infinite loop - DON'T use hlt for now (testing)
-	// When you press a key:
-	//   1. Keyboard sends signal to PIC (IRQ1)
-	//   2. PIC signals CPU
-	//   3. CPU jumps to our keyboard handler (INT 33)
-	//   4. Handler reads key, displays it, sends EOI
-	//   5. CPU returns here and halts again
+	// Idle loop — this is now the "idle" task (ID 0)
+	// When no other task is READY, the scheduler keeps running this.
+	// hlt suspends the CPU until the next interrupt, saving power.
+	// task_reap() frees resources of any finished tasks.
 	while (1) {
-		// Just loop (no hlt) to test if hlt is the problem
+		__asm__ volatile("hlt");
+		task_reap();
 	}
 }
