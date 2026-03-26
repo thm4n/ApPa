@@ -121,6 +121,7 @@ task_t* task_create_user(task_entry_t entry, const char *name);
  * Returns: Pointer to the new task, or NULL on failure.
  */
 task_t* task_create_user_mapped(uint32_t entry_vaddr, const char *name,
-                                 void *dir, uint32_t dir_phys);
+                                 void *dir, uint32_t dir_phys,
+                                 uint32_t user_esp);
 
 #endif // TASK_H

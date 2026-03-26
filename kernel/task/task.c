@@ -338,7 +338,8 @@ task_t* task_create_user(task_entry_t entry, const char *name) {
  * adds the task to the scheduler's ready queue.
  */
 task_t* task_create_user_mapped(uint32_t entry_vaddr, const char *name,
-                                 void *dir, uint32_t dir_phys) {
+                                 void *dir, uint32_t dir_phys,
+                                 uint32_t user_esp) {
     task_t *t = alloc_tcb();
     if (!t) return 0;
 
@@ -363,7 +364,7 @@ task_t* task_create_user_mapped(uint32_t entry_vaddr, const char *name,
 
     /* user_stack is managed by the page directory (not tracked here) */
     t->user_stack     = 0;
-    t->user_stack_top = USER_STACK_TOP;
+    t->user_stack_top = user_esp;  /* may be below USER_STACK_TOP if args pushed */
 
     /* ── Build iret frame on the kernel stack ──────────────────────── *
      *

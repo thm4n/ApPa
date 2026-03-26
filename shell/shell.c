@@ -540,23 +540,52 @@ static void cmd_addrtest(void) {
 
 /**
  * cmd_exec - Load and execute an ELF binary from the filesystem
- * @args: Filename of the ELF binary
+ * @args: Filename followed by optional arguments (e.g. "hello.elf foo bar")
  */
 static void cmd_exec(const char* args) {
 	if (!*args) {
-		kprint("Usage: exec <filename>\n");
+		kprint("Usage: exec <filename> [args...]\n");
 		return;
 	}
 
-	kprintf("[ELF] Loading '%s'...\n", args);
+	/* Tokenize into argv array (max 16 args) */
+	#define MAX_EXEC_ARGS 16
+	static char arg_buf[256];
+	const char *argv[MAX_EXEC_ARGS + 1];
+	int argc = 0;
 
-	task_t *t = elf_exec(args, args);
+	/* Copy args to mutable buffer */
+	int len = 0;
+	while (args[len] && len < 255) { arg_buf[len] = args[len]; len++; }
+	arg_buf[len] = '\0';
+
+	/* Split by spaces */
+	char *p = arg_buf;
+	while (*p && argc < MAX_EXEC_ARGS) {
+		/* Skip leading spaces */
+		while (*p == ' ') p++;
+		if (!*p) break;
+		argv[argc++] = p;
+		/* Find end of token */
+		while (*p && *p != ' ') p++;
+		if (*p) *p++ = '\0';
+	}
+	argv[argc] = 0;  /* NULL sentinel */
+
+	if (argc == 0) {
+		kprint("Usage: exec <filename> [args...]\n");
+		return;
+	}
+
+	kprintf("[ELF] Loading '%s' with %d arg(s)...\n", argv[0], argc);
+
+	task_t *t = elf_exec(argv[0], argv[0], argv, argc);
 	if (!t) {
-		kprintf("[ELF] Failed to load '%s'\n", args);
+		kprintf("[ELF] Failed to load '%s'\n", argv[0]);
 		return;
 	}
 
-	kprintf("[ELF] Spawned task '%s' (tid=%d)\n", args, t->id);
+	kprintf("[ELF] Spawned task '%s' (tid=%d)\n", argv[0], t->id);
 }
 
 /**

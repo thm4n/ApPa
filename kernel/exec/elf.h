@@ -124,27 +124,33 @@ typedef struct {
  * elf_exec — Load an ELF binary from SimpleFS and spawn a user process
  * @filename:  SimpleFS file name (max 23 chars)
  * @task_name: Human-readable name for the task
+ * @argv:      NULL-terminated array of argument strings (can be NULL)
+ * @argc:      Number of arguments (0 = no arguments)
  *
  * Reads the file, validates the ELF header, maps PT_LOAD segments into
- * a new per-process address space, sets up a user stack, and creates
- * a Ring 3 task starting at the ELF entry point.
+ * a new per-process address space, sets up a user stack with argv/argc,
+ * and creates a Ring 3 task starting at the ELF entry point.
  *
  * Returns: Pointer to the new task, or NULL on failure.
  */
-task_t* elf_exec(const char *filename, const char *task_name);
+task_t* elf_exec(const char *filename, const char *task_name,
+                 const char **argv, int argc);
 
 /**
  * elf_exec_mem — Load an ELF binary from a memory buffer
  * @buf:       Pointer to the ELF file contents
  * @size:      Size of the buffer in bytes
  * @task_name: Human-readable name for the task
+ * @argv:      NULL-terminated array of argument strings (can be NULL)
+ * @argc:      Number of arguments (0 = no arguments)
  *
  * Same as elf_exec() but reads from an in-memory buffer instead of
  * the filesystem.  Useful for embedded test binaries.
  *
  * Returns: Pointer to the new task, or NULL on failure.
  */
-task_t* elf_exec_mem(const void *buf, uint32_t size, const char *task_name);
+task_t* elf_exec_mem(const void *buf, uint32_t size, const char *task_name,
+                     const char **argv, int argc);
 
 /**
  * elf_validate — Check whether a buffer contains a valid ELF32 i386 executable

@@ -6,8 +6,8 @@
 MAKEFLAGS += --no-builtin-rules
 .SUFFIXES:
 
-C_SOURCES = $(filter-out user/%.c, $(wildcard *.c */*.c */*/*.c))
-HEADERS = $(filter-out user/%.h, $(wildcard *.h */*.h */*/*.h))
+C_SOURCES = $(filter-out user/%.c libc/%.c, $(wildcard *.c */*.c */*/*.c))
+HEADERS = $(filter-out user/%.h libc/%.h, $(wildcard *.h */*.h */*/*.h))
 OBJ = ${C_SOURCES:.c=.o}
 
 # Kernel assembly sources (not boot sector)
@@ -96,6 +96,7 @@ help:
 	@printf "\n$(CLR_BLD)  ApPa OS$(CLR_RST)$(CLR_DIM)  ──  i686 bare-metal kernel$(CLR_RST)\n"
 	@printf "$(CLR_DIM)  ─────────────────────────────────────────$(CLR_RST)\n"
 	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make build"       "Compile kernel + assemble disk image"
+	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make userelf"     "Build user ELF programs → user/bin/"
 	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make run"         "Build & launch QEMU (graphical window)"
 	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make run-term"    "Build & launch QEMU (curses terminal)"
 	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make run-log"     "Build & launch QEMU (curses + serial log)"
@@ -161,21 +162,42 @@ check:
 # Built separately with their own linker script, then converted to
 # embeddable C headers via xxd so they can be written to SimpleFS
 # at runtime or embedded in tests.
+#
+# Every user program is automatically linked with:
+#   crt0.o      — C Runtime Zero (_start → main bridge)
+#   libc/*.o    — User-space C library (syscalls, strings, I/O)
 
 USER_DIR     = user
-USER_SOURCES = $(wildcard $(USER_DIR)/*.c)
-USER_ELFS    = $(USER_SOURCES:.c=.elf)
-USER_HEADERS = $(USER_SOURCES:.c=_elf.h)
+LIBC_DIR     = libc
+
+# Runtime support objects (built once, linked into every user ELF)
+# crt0.o lives in libc/ alongside the other runtime support code.
+LIBC_SOURCES    = $(wildcard $(LIBC_DIR)/*.c)
+LIBC_OBJECTS    = $(LIBC_SOURCES:.c=.o)
+LIBC_CRT0       = $(LIBC_DIR)/crt0.o
+# All libc objects EXCEPT crt0 (crt0 is linked first, separately)
+LIBC_LIBS       = $(filter-out $(LIBC_CRT0), $(LIBC_OBJECTS))
+USER_RUNTIME    = $(LIBC_CRT0) $(LIBC_LIBS)
+
+# User programs = all .c files in user/
+USER_PROGRAMS = $(wildcard $(USER_DIR)/*.c)
+USER_ELFS     = $(USER_PROGRAMS:.c=.elf)
+USER_HEADERS  = $(USER_PROGRAMS:.c=_elf.h)
 
 # Compile user .c → .o (freestanding, no stdlib)
 $(USER_DIR)/%.o: $(USER_DIR)/%.c
 	$(call log,USR_CC,$<)
 	$(Q)$(CC) -g -ffreestanding -nostdlib -march=i686 -c $< -o $@
 
-# Link user .o → .elf using the user linker script
-$(USER_DIR)/%.elf: $(USER_DIR)/%.o $(USER_DIR)/link.ld
+# Compile libc .c → .o (freestanding, no stdlib)
+$(LIBC_DIR)/%.o: $(LIBC_DIR)/%.c
+	$(call log,LIBC_CC,$<)
+	$(Q)$(CC) -g -ffreestanding -nostdlib -march=i686 -c $< -o $@
+
+# Link user .o → .elf with crt0.o first, then program, then libc objects
+$(USER_DIR)/%.elf: $(USER_DIR)/%.o $(USER_RUNTIME) $(USER_DIR)/link.ld
 	$(call log,USR_LD,$@)
-	$(Q)$(LD) -T $(USER_DIR)/link.ld $< -o $@
+	$(Q)$(LD) -T $(USER_DIR)/link.ld $(LIBC_CRT0) $< $(LIBC_LIBS) -o $@
 
 # Convert .elf → _elf.h (C byte array) via xxd
 $(USER_DIR)/%_elf.h: $(USER_DIR)/%.elf
@@ -185,6 +207,25 @@ $(USER_DIR)/%_elf.h: $(USER_DIR)/%.elf
 # Convenience target to build all user programs
 user-programs: $(USER_ELFS) $(USER_HEADERS)
 	$(call log,USR,$(words $(USER_ELFS)) user program(s) built)
+
+# ========== userelf — Build ELFs and copy to user/bin/ ==========
+# Produces standalone .elf files ready to load into the OS via SimpleFS.
+USR_BIN_DIR = $(USER_DIR)/bin
+
+userelf: $(USER_ELFS) | $(USR_BIN_DIR)
+	@printf "\n$(CLR_BLD)  ApPa OS$(CLR_RST)$(CLR_DIM)  ──  user ELF programs$(CLR_RST)\n"
+	@printf "$(CLR_DIM)  ─────────────────────────────────────────$(CLR_RST)\n"
+	$(Q)cp $(USER_ELFS) $(USR_BIN_DIR)/
+	@for f in $(USER_ELFS); do \
+		NAME=$$(basename $$f); \
+		SIZE=$$(stat -c%s $$f 2>/dev/null || echo '?'); \
+		printf "  $(CLR_CYN)%-8s$(CLR_RST) %-20s  %s bytes\n" "[ELF]" "$$NAME" "$$SIZE"; \
+	done
+	@printf "$(CLR_DIM)  ─────────────────────────────────────────$(CLR_RST)\n"
+	@printf "  $(CLR_GRN)%-8s$(CLR_RST) %d program(s) → %s/\n\n" "[DONE]" $(words $(USER_ELFS)) $(USR_BIN_DIR)
+
+$(USR_BIN_DIR):
+	@mkdir -p $(USR_BIN_DIR)
 
 # Kernel objects depend on generated user ELF headers
 $(OBJ): $(USER_HEADERS)
@@ -265,10 +306,12 @@ clean:
 	@printf "$(CLR_DIM)  ─────────────────────────────────────────$(CLR_RST)\n"
 	$(call log,CLEAN,bin/* (preserving disk.img))
 	@find $(BIN_DIR) -maxdepth 1 -type f ! -name 'disk.img' -exec rm -f {} + 2>/dev/null || true
+	@rm -rf $(BIN_DIR)/elf 2>/dev/null || true
 	$(call log,CLEAN,*.o)
 	@rm -f $(wildcard *.o */*.o */*/*.o)
-	$(call log,CLEAN,user/*.elf user/*_elf.h)
-	@rm -f $(wildcard user/*.o user/*.elf user/*_elf.h)
+	$(call log,CLEAN,user/*.elf user/*_elf.h user/bin/ libc/*.o)
+	@rm -f $(wildcard user/*.o user/*.elf user/*_elf.h libc/*.o)
+	@rm -rf user/bin 2>/dev/null || true
 	@printf "  $(CLR_GRN)%-8s$(CLR_RST) All build artifacts removed\n\n" "[DONE]"
 
 # ========== Memory Layout Inspector ==========
@@ -335,4 +378,4 @@ IMG ?= $(DISK_IMG)
 mem_img_show:
 	@python3 tools/simplefs_inspect.py $(IMG)
 
-.PHONY: all help build run run-graphics run-term run-log debug clean check disk-reset mem_show mem_img_show _build_banner _build_done user-programs
+.PHONY: all help build run run-graphics run-term run-log debug clean check disk-reset mem_show mem_img_show _build_banner _build_done user-programs userelf

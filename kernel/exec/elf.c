@@ -154,14 +154,107 @@ static int load_segments(const void *buf, uint32_t size,
     return 0;
 }
 
+/* ─── Maximum argument data that fits in one stack page ─────────────────── */
+
+#define ARGV_MAX_TOTAL  (PAGE_SIZE - 256)  /* Reserve 256 bytes for stack frames */
+
+/**
+ * setup_user_stack_args — Write argv/argc onto the user stack page
+ *
+ * Layout written (high address → low address):
+ *
+ *   USER_STACK_TOP  (0xC0000000)
+ *   ┌──────────────────────────────────┐
+ *   │  "arg2\0" "arg1\0" "arg0\0"     │  String data (top of page)
+ *   │  NULL              (sentinel)    │  argv[argc]
+ *   │  ptr → "arg2"      (argv[2])    │  argv[2]   ← virtual pointers
+ *   │  ptr → "arg1"      (argv[1])    │  argv[1]
+ *   │  ptr → "arg0"      (argv[0])    │  argv[0]
+ *   │  argv pointer       (→argv[0])  │  [ESP+4]
+ *   │  argc = 3                       │  [ESP]   ← returned ESP
+ *   └──────────────────────────────────┘
+ *   USER_STACK_VIRT (0xBFFFF000)
+ *
+ * @ustack_phys: Physical address of the zeroed user stack page
+ * @argv:        NULL-terminated argument string array (may be NULL)
+ * @argc:        Number of arguments (0 = no arguments)
+ *
+ * Returns: Virtual ESP value for the user task's iret frame.
+ *          If argc == 0 or argv == NULL, returns USER_STACK_TOP (no args).
+ */
+static uint32_t setup_user_stack_args(uint32_t ustack_phys,
+                                      const char **argv, int argc) {
+    if (!argv || argc <= 0)
+        return USER_STACK_TOP;
+
+    uint8_t *page_base = (uint8_t *)ustack_phys;        /* phys page start */
+    uint8_t *page_top  = page_base + PAGE_SIZE;          /* one past end    */
+
+    /* ── Step 1: Compute total string size and bounds-check ────────── */
+    uint32_t total_str = 0;
+    for (int i = 0; i < argc; i++) {
+        uint32_t len = 0;
+        const char *s = argv[i];
+        while (s[len]) len++;
+        total_str += len + 1;  /* include NUL */
+    }
+
+    /* pointer table: argc pointers + 1 NULL sentinel + argv ptr + argc value */
+    uint32_t ptr_space = (uint32_t)(argc + 1 + 1 + 1) * 4;
+    if (total_str + ptr_space > ARGV_MAX_TOTAL) {
+        klog_error("ELF: argv too large (%u + %u > %u)",
+                   total_str, ptr_space, ARGV_MAX_TOTAL);
+        return USER_STACK_TOP;  /* fallback: no args */
+    }
+
+    /* ── Step 2: Copy strings at the top of the physical page ──────── */
+    uint8_t *str_cursor = page_top;
+    uint32_t virt_addrs[64];  /* virtual addresses for each string */
+
+    for (int i = argc - 1; i >= 0; i--) {
+        uint32_t len = 0;
+        const char *s = argv[i];
+        while (s[len]) len++;
+        len++;  /* include NUL */
+
+        str_cursor -= len;
+        memcpy(str_cursor, argv[i], len);
+
+        /* Virtual address = USER_STACK_TOP - (page_top - str_cursor) */
+        virt_addrs[i] = USER_STACK_TOP - (uint32_t)(page_top - str_cursor);
+    }
+
+    /* ── Step 3: Align down to 4 bytes ─────────────────────────────── */
+    str_cursor = (uint8_t *)((uint32_t)str_cursor & ~0x3);
+
+    /* ── Step 4: Write pointer array + argc below the strings ──────── */
+    uint32_t *slot = (uint32_t *)str_cursor;
+
+    *(--slot) = 0;  /* NULL sentinel: argv[argc] */
+    for (int i = argc - 1; i >= 0; i--)
+        *(--slot) = virt_addrs[i];  /* argv[i] pointer */
+
+    /* Virtual address of argv[0] in user space */
+    uint32_t argv_virt = USER_STACK_TOP -
+                         (uint32_t)(page_top - (uint8_t *)(slot));
+
+    *(--slot) = argv_virt;       /* argv pointer (for [ESP+4]) */
+    *(--slot) = (uint32_t)argc;  /* argc         (for [ESP])   */
+
+    /* ── Step 5: Compute and return the virtual ESP ────────────────── */
+    uint32_t esp = USER_STACK_TOP - (uint32_t)(page_top - (uint8_t *)slot);
+    return esp;
+}
+
 /**
  * elf_load_internal — Core loader that works from a memory buffer
  *
  * Validates the ELF, creates a page directory, loads segments,
- * maps the user stack, and spawns the task.
+ * maps the user stack, writes argv/argc, and spawns the task.
  */
 static task_t* elf_load_internal(const void *buf, uint32_t size,
-                                  const char *task_name) {
+                                  const char *task_name,
+                                  const char **argv, int argc) {
     /* ── Validate ELF header ───────────────────────────────────────── */
     if (elf_validate(buf, size) != 0) {
         klog_error("ELF: invalid header for '%s'", task_name);
@@ -170,8 +263,8 @@ static task_t* elf_load_internal(const void *buf, uint32_t size,
 
     const elf32_ehdr_t *ehdr = (const elf32_ehdr_t *)buf;
 
-    klog_info("ELF: loading '%s' entry=0x%x phnum=%d",
-              task_name, ehdr->e_entry, ehdr->e_phnum);
+    klog_info("ELF: loading '%s' entry=0x%x phnum=%d argc=%d",
+              task_name, ehdr->e_entry, ehdr->e_phnum, argc);
 
     /* ── Create per-process page directory ─────────────────────────── */
     uint32_t dir_phys = 0;
@@ -199,24 +292,28 @@ static task_t* elf_load_internal(const void *buf, uint32_t size,
     paging_map_page_in(dir, USER_STACK_VIRT, ustack_phys,
                        PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER);
 
+    /* ── Write argv/argc onto the user stack ───────────────────────── */
+    uint32_t user_esp = setup_user_stack_args(ustack_phys, argv, argc);
+
     /* ── Create the user task ──────────────────────────────────────── */
     task_t *t = task_create_user_mapped(ehdr->e_entry, task_name,
-                                         dir, dir_phys);
+                                         dir, dir_phys, user_esp);
     if (!t) {
         klog_error("ELF: failed to create task for '%s'", task_name);
         paging_free_directory(dir);
         return 0;
     }
 
-    klog_info("ELF: spawned task '%s' (tid=%d, entry=0x%x, cr3=0x%x)",
-              task_name, t->id, ehdr->e_entry, dir_phys);
+    klog_info("ELF: spawned task '%s' (tid=%d, entry=0x%x, cr3=0x%x, esp=0x%x)",
+              task_name, t->id, ehdr->e_entry, dir_phys, user_esp);
 
     return t;
 }
 
 /* ─── Public API ────────────────────────────────────────────────────────── */
 
-task_t* elf_exec(const char *filename, const char *task_name) {
+task_t* elf_exec(const char *filename, const char *task_name,
+                 const char **argv, int argc) {
     if (!filename || !task_name) return 0;
 
     /* Get file size */
@@ -248,13 +345,15 @@ task_t* elf_exec(const char *filename, const char *task_name) {
     }
 
     /* Load and exec */
-    task_t *t = elf_load_internal(buf, (uint32_t)bytes_read, task_name);
+    task_t *t = elf_load_internal(buf, (uint32_t)bytes_read, task_name,
+                                  argv, argc);
 
     kfree(buf);
     return t;
 }
 
-task_t* elf_exec_mem(const void *buf, uint32_t size, const char *task_name) {
+task_t* elf_exec_mem(const void *buf, uint32_t size, const char *task_name,
+                     const char **argv, int argc) {
     if (!buf || size == 0 || !task_name) return 0;
-    return elf_load_internal(buf, size, task_name);
+    return elf_load_internal(buf, size, task_name, argv, argc);
 }

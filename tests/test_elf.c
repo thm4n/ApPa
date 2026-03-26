@@ -87,7 +87,8 @@ static void test_elf_validate(void) {
 static void test_elf_mem_load(void) {
     kprint("\n--- Test 2: ELF Load from Memory ---\n");
 
-    task_t *t = elf_exec_mem(user_hello_elf, user_hello_elf_len, "elf_mem");
+    task_t *t = elf_exec_mem(user_hello_elf, user_hello_elf_len, "elf_mem",
+                              0, 0);
     TEST_ASSERT(t != 0, "elf_exec_mem() returned non-NULL task");
 
     if (t) {
@@ -114,7 +115,7 @@ static void test_elf_fs_load(void) {
     TEST_ASSERT(rc == 0, "Wrote hello.elf to SimpleFS");
 
     /* Execute it */
-    task_t *t = elf_exec("hello.elf", "elf_fs");
+    task_t *t = elf_exec("hello.elf", "elf_fs", 0, 0);
     TEST_ASSERT(t != 0, "elf_exec() returned non-NULL task");
 
     if (t) {
@@ -126,7 +127,7 @@ static void test_elf_fs_load(void) {
     }
 
     /* Non-existent file */
-    task_t *bad = elf_exec("nofile.elf", "bad");
+    task_t *bad = elf_exec("nofile.elf", "bad", 0, 0);
     TEST_ASSERT(bad == 0, "elf_exec() returns NULL for missing file");
 
     /* Clean up test file */
@@ -141,7 +142,8 @@ static void test_elf_cleanup(void) {
     uint32_t free_before = get_free_memory();
 
     /* Spawn, let run, reap */
-    task_t *t = elf_exec_mem(user_hello_elf, user_hello_elf_len, "elf_clean");
+    task_t *t = elf_exec_mem(user_hello_elf, user_hello_elf_len, "elf_clean",
+                              0, 0);
     TEST_ASSERT(t != 0, "Spawned cleanup test task");
 
     if (t) {
