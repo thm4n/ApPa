@@ -1,7 +1,7 @@
 #ifndef PMM_H
 #define PMM_H
 
-#include "../../libc/stdint.h"
+#include "../../klibc/stdint.h"
 
 /**
  * Physical Memory Manager (PMM)

@@ -1,7 +1,7 @@
 #ifndef SERIAL_H
 #define SERIAL_H
 
-#include "../libc/stdint.h"
+#include "../klibc/stdint.h"
 
 // COM1 serial port base address
 #define SERIAL_COM1 0x3F8

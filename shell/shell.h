@@ -1,7 +1,7 @@
 #ifndef SHELL_H
 #define SHELL_H
 
-#include "../libc/stdint.h"
+#include "../klibc/stdint.h"
 
 #define SHELL_BUFFER_SIZE 256
 

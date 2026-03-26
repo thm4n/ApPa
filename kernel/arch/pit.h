@@ -5,7 +5,7 @@
 #ifndef PIT_H
 #define PIT_H
 
-#include "../../libc/stdint.h"
+#include "../../klibc/stdint.h"
 
 /**
  * pit_init - Initialize the PIT to generate periodic IRQ0 interrupts

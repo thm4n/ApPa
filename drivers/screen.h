@@ -1,5 +1,5 @@
 #include "ports.h"
-#include "../libc/stdint.h"
+#include "../klibc/stdint.h"
 
 #define VIDEO_ADDRESS (unsigned char*)0xb8000
 #define MAX_ROWS 25

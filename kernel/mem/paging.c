@@ -12,7 +12,7 @@
 #include "../task/task.h"
 #include "../sys/klog.h"
 #include "../../drivers/screen.h"
-#include "../../libc/string.h"
+#include "../../klibc/string.h"
 
 // ─── Globals ───────────────────────────────────────────────────────────────
 

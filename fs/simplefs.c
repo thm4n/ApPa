@@ -6,7 +6,7 @@
  */
 
 #include "simplefs.h"
-#include "../libc/string.h"
+#include "../klibc/string.h"
 #include "../drivers/screen.h"
 
 /* ========== State ========== */

@@ -11,7 +11,7 @@
 #ifndef ELF_H
 #define ELF_H
 
-#include "../../libc/stdint.h"
+#include "../../klibc/stdint.h"
 #include "../task/task.h"
 
 /* ─── ELF Identification (e_ident) ──────────────────────────────────────── */

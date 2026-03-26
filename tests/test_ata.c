@@ -5,7 +5,7 @@
 #include "test_ata.h"
 #include "../drivers/ata.h"
 #include "../drivers/screen.h"
-#include "../libc/string.h"
+#include "../klibc/string.h"
 
 void test_ata(void) {
     kprint("=== Testing ATA PIO Driver ===\n");

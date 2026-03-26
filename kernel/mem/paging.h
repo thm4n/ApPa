@@ -1,7 +1,7 @@
 #ifndef PAGING_H
 #define PAGING_H
 
-#include "../../libc/stdint.h"
+#include "../../klibc/stdint.h"
 #include "../arch/isr.h"
 
 /**

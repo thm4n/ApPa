@@ -1,7 +1,7 @@
 #ifndef BLOCK_H
 #define BLOCK_H
 
-#include "../libc/stdint.h"
+#include "../klibc/stdint.h"
 
 /**
  * Block Device Interface

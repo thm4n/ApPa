@@ -1,10 +1,18 @@
-# Phase 17 — Command-Line Arguments (argv/argc)
+# Phase 17 — Command-Line Arguments, crt0 & User Libc
 
 ## Goal
 
-Pass command-line arguments from the shell's `exec` command to user-space
-ELF programs, so `exec hello.elf foo bar` delivers `argc=3` and
-`argv={"hello.elf", "foo", "bar"}` to `_start`.
+1. Pass command-line arguments from the shell's `exec` command to user-space
+   ELF programs, so `exec hello.elf foo bar` delivers `argc=3` and
+   `argv={"hello.elf", "foo", "bar"}` to `_start`.
+
+2. Provide a **crt0** (C runtime zero) startup stub so user programs can
+   be written with a standard `int main(int argc, char **argv)` entry point
+   instead of hand-coding `_start` with inline assembly.
+
+3. Provide a **user-space libc** with syscall wrappers and string utilities,
+   so user programs don't have to inline every helper and can simply
+   `#include "ulibc.h"`.
 
 ---
 
@@ -64,7 +72,123 @@ process will see. This is the same technique used for the iret frame.
 
 ---
 
-## Design
+## Theory — crt0 (C Runtime Zero)
+
+### What Is crt0?
+
+On every Unix/Linux system, user programs don't actually start at `main()`.
+They start at `_start`, a small assembly or C stub provided by the C runtime
+library. This stub is called **crt0** (C Runtime Zero — the very first thing
+that runs).
+
+crt0's job is:
+1. **Read argc/argv** from the stack (placed there by the kernel)
+2. **Call main(argc, argv)** — the programmer's entry point
+3. **Call exit()** with main's return value — ensures clean process teardown
+   even if the programmer forgets to call `exit()` explicitly
+
+```
+Kernel                    crt0                      User code
+───────                   ────                      ─────────
+iret → _start()    →    read [esp], [esp+4]   →   main(argc, argv)
+                         ret = main(argc,argv)      return 0;
+                         sys_exit(ret)          ←   ←──────────
+```
+
+Without crt0, every user program must hand-code `_start` with inline
+assembly to read the stack, and must explicitly call `sys_exit()` at the
+end. crt0 eliminates this boilerplate.
+
+### ApPa's crt0
+
+A minimal `user/crt0.c` that:
+- Is always linked as the **first object** in every user ELF
+- Defines `_start` (matches `ENTRY(_start)` in `link.ld`)
+- Reads argc/argv via inline ASM
+- Calls `extern int main(int argc, char **argv)`
+- Calls `sys_exit(ret)` after main returns
+- Contains an infinite `hlt` loop as a safety net
+
+```c
+/* user/crt0.c — C Runtime Zero for ApPa user programs */
+#include "ulibc.h"
+
+extern int main(int argc, char **argv);
+
+void _start(void) {
+    int argc;
+    char **argv;
+
+    __asm__ volatile("mov (%%esp), %0" : "=r"(argc));
+    __asm__ volatile("mov 4(%%esp), %0" : "=r"(argv));
+
+    int ret = main(argc, argv);
+
+    sys_exit(ret);
+    for (;;) __asm__ volatile("hlt");
+}
+```
+
+---
+
+## Theory — User-Space Libc
+
+### The Problem
+
+Currently `libc/syscall.c`, `libc/string.c`, and `libc/stdio.c` are
+compiled into the **kernel** binary. User ELF programs can't call those
+functions — they're in the kernel's address space, not linked into the
+user binary.
+
+User programs in `user/hello.c` currently duplicate everything inline:
+`syscall0()`, `syscall2()`, `strlen_u()`, `itoa_u()`, `write_str()`.
+This doesn't scale. Each new program would have to re-implement them.
+
+### The Solution
+
+Create a small **user-space library** (`user/ulibc.c` + `user/ulibc.h`)
+that provides:
+
+| Category | Functions |
+|----------|-----------|
+| **Syscall wrappers** | `sys_exit()`, `sys_write()`, `sys_read()`, `sys_getpid()`, `sys_yield()`, `sys_sleep()` |
+| **String utilities** | `strlen()`, `strcmp()`, `strcpy()`, `memcpy()`, `memset()` |
+| **Output helpers** | `puts()` (write string + newline), `putchar()`, `itoa()` |
+| **Types** | `uint32_t`, `int32_t`, `NULL`, `size_t` |
+
+These are compiled as regular freestanding C — no kernel headers, no magic.
+They use `INT 0x80` inline assembly for syscalls, same ABI as the kernel
+expects.
+
+### Build Pipeline
+
+```
+Before (Phase 16):
+  hello.c  →  hello.o  →  hello.elf
+
+After (Phase 17):
+  crt0.c   →  crt0.o  ─┐
+  ulibc.c  →  ulibc.o ─┼→  ld -T link.ld  →  hello.elf
+  hello.c  →  hello.o ─┘
+```
+
+The makefile links `crt0.o` first (so `_start` is at the entry), then
+the user program, then `ulibc.o`. Every user program gets crt0 + ulibc
+automatically.
+
+### Directory Layout After Phase 17
+
+```
+user/
+├── crt0.c          # C Runtime Zero (_start → main bridge)
+├── ulibc.c         # User-space libc implementation
+├── ulibc.h         # User-space libc header
+├── link.ld         # Linker script (unchanged)
+├── hello.c         # Updated: now uses main() + ulibc.h
+└── hello_elf.h     # Auto-generated (xxd embed)
+```
+
+---
 
 ### API Changes
 
@@ -272,39 +396,99 @@ Add argv/argc parameters. Thread them through to `elf_load_internal()`.
 
 Tokenize the argument string into an argv array. Pass to `elf_exec()`.
 
-### Step 6 — Update `user/hello.c`
+### Step 6 — Create `user/ulibc.h` and `user/ulibc.c`
 
-Modify `_start` to read argc/argv from the stack and print them:
+**`ulibc.h`** — Public header for user programs:
 
 ```c
-void _start(void) {
-    int argc;
-    char **argv;
-    __asm__ volatile("mov (%%esp), %0" : "=r"(argc));
-    __asm__ volatile("mov 4(%%esp), %0" : "=r"(argv));
+#ifndef ULIBC_H
+#define ULIBC_H
 
-    write_str("Hello from ELF!\n");
-    write_str("  argc = ");
-    char buf[12]; itoa_u(argc, buf); write_str(buf);
-    write_str("\n");
+/* ── Types ────────────────────────────────────── */
+typedef unsigned int   uint32_t;
+typedef int            int32_t;
+typedef unsigned short uint16_t;
+typedef unsigned char  uint8_t;
+typedef unsigned int   size_t;
+#define NULL ((void *)0)
+
+/* ── Syscall wrappers ─────────────────────────── */
+void  sys_exit(int code);
+int   sys_write(const char *buf, int len);
+int   sys_read(char *buf, int max);
+int   sys_getpid(void);
+void  sys_yield(void);
+void  sys_sleep(int ms);
+
+/* ── String functions ─────────────────────────── */
+int    strlen(const char *s);
+int    strcmp(const char *a, const char *b);
+char  *strcpy(char *dst, const char *src);
+void  *memcpy(void *dst, const void *src, size_t n);
+void  *memset(void *dst, int val, size_t n);
+
+/* ── Output helpers ───────────────────────────── */
+void  puts(const char *s);
+void  putchar(char c);
+void  print_int(int val);
+
+#endif
+```
+
+**`ulibc.c`** — Implements all of the above using `INT 0x80` for syscalls
+and pure C for string operations. No kernel headers included.
+
+### Step 7 — Create `user/crt0.c`
+
+The C Runtime Zero stub as described in the theory section. Reads
+argc/argv from the stack, calls `main()`, calls `sys_exit()`.
+
+### Step 8 — Update `user/hello.c` to use `main()`
+
+Rewrite hello.c to use the standard entry point:
+
+```c
+#include "ulibc.h"
+
+int main(int argc, char **argv) {
+    puts("Hello from ELF!");
+
+    puts("  argc = ");
+    print_int(argc);
+    putchar('\n');
 
     for (int i = 0; i < argc; i++) {
-        write_str("  argv["); itoa_u(i, buf); write_str(buf);
-        write_str("] = \""); write_str(argv[i]); write_str("\"\n");
+        puts("  argv[");
+        print_int(i);
+        puts("] = \"");
+        sys_write(argv[i], strlen(argv[i]));
+        puts("\"");
+        putchar('\n');
     }
 
-    syscall0(SYS_EXIT);
-    for (;;);
+    return 0;   /* crt0 calls sys_exit(0) */
 }
 ```
 
-### Step 7 — Update tests
+### Step 9 — Update makefile build pipeline
+
+- Compile `user/crt0.c` → `user/crt0.o`
+- Compile `user/ulibc.c` → `user/ulibc.o`
+- For each user program `user/X.c`:
+  - Compile `user/X.c` → `user/X.o`
+  - Link: `ld -T link.ld crt0.o X.o ulibc.o → X.elf`
+- `crt0.o` and `ulibc.o` are built once and reused for all user programs
+- Update the `clean` target to remove `crt0.o` and `ulibc.o`
+
+### Step 10 — Update tests
 
 Add test cases in `test_elf.c`:
 - `elf_exec_mem()` with argc=0 (backward compatible, no args)
 - `elf_exec_mem()` with argc=3 (verify task spawns and prints args)
+- Verify `main()` return value flows through to `sys_exit()` (if
+  the kernel tracks exit codes in the future)
 
-### Step 8 — Update callers
+### Step 11 — Update callers
 
 Any existing calls to the old `elf_exec()` / `elf_exec_mem()` /
 `task_create_user_mapped()` signatures must be updated to pass the
@@ -321,7 +505,11 @@ new parameters (NULL/0 for no arguments, USER_STACK_TOP for ESP).
 | `kernel/task/task.h` | `task_create_user_mapped()` gains `user_esp` param |
 | `kernel/task/task.c` | Use `user_esp` in iret frame instead of fixed `USER_STACK_TOP` |
 | `shell/shell.c` | `cmd_exec()` tokenizes args, passes argv/argc |
-| `user/hello.c` | `_start` reads argc/argv from stack, prints them |
+| `user/crt0.c` | **NEW** — C Runtime Zero (_start → main bridge) |
+| `user/ulibc.h` | **NEW** — User-space libc header |
+| `user/ulibc.c` | **NEW** — User-space libc implementation (syscalls, strings, output) |
+| `user/hello.c` | Rewritten: uses `int main(int argc, char **argv)` + `ulibc.h` |
+| `makefile` | Updated user build pipeline: crt0.o + ulibc.o auto-linked |
 | `tests/test_elf.c` | New test cases for argv passing |
 
 ---
@@ -362,5 +550,28 @@ Hello from ELF!
   argv[3] = "baz"
 ```
 
+Running with no arguments:
+
+```
+> exec hello.elf
+```
+
+Should produce:
+
+```
+Hello from ELF!
+  argc = 1
+  argv[0] = "hello.elf"
+```
+
 And `elftest` should still pass all 14 existing tests plus the new
 argument-passing tests.
+
+### What "Works" Means
+
+- `hello.c` uses `int main(int argc, char **argv)` — no inline ASM
+- `crt0.c` handles `_start` → `main()` → `sys_exit()` transparently
+- User programs only `#include "ulibc.h"` for syscalls, strings, output
+- The makefile auto-links `crt0.o` + `ulibc.o` into every user ELF
+- Adding a new user program is just: create `user/foo.c` with a `main()`,
+  run `make build`, then `exec foo.elf` in the shell

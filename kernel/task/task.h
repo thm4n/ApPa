@@ -14,7 +14,7 @@
 #ifndef TASK_H
 #define TASK_H
 
-#include "../../libc/stdint.h"
+#include "../../klibc/stdint.h"
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 

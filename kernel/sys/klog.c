@@ -1,7 +1,7 @@
 #include "klog.h"
-#include "../../libc/stdio.h"
-#include "../../libc/stdarg.h"
-#include "../../libc/string.h"
+#include "../../klibc/stdio.h"
+#include "../../klibc/stdarg.h"
+#include "../../klibc/string.h"
 #include "../../drivers/screen.h"
 #include "../../fs/simplefs.h"
 

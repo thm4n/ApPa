@@ -20,7 +20,7 @@
 #include "../kernel/task/task.h"
 #include "../kernel/task/sched.h"
 #include "../kernel/sys/timer.h"
-#include "../libc/string.h"
+#include "../klibc/string.h"
 
 // ─── Shared state between test tasks and the test harness ──────────────────
 

@@ -19,7 +19,7 @@
 #include "../mem/paging.h"
 #include "../../drivers/screen.h"
 #include "../../drivers/keyboard.h"
-#include "../../libc/string.h"
+#include "../../klibc/string.h"
 
 /* ─── Forward declarations of handlers ──────────────────────────────────── */
 

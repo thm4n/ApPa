@@ -1,7 +1,7 @@
 #ifndef ISR_H
 #define ISR_H
 
-#include "../../libc/stdint.h"
+#include "../../klibc/stdint.h"
 
 // Structure matching the stack after isr_common_stub saves state
 typedef struct {

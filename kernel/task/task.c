@@ -11,7 +11,7 @@
 #include "../mem/pmm.h"
 #include "../mem/paging.h"
 #include "../arch/gdt.h"
-#include "../../libc/string.h"
+#include "../../klibc/string.h"
 
 // ─── Static task pool (avoids kmalloc dependency for TCBs) ─────────────────
 

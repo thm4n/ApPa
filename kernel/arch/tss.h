@@ -12,7 +12,7 @@
 #ifndef TSS_H
 #define TSS_H
 
-#include "../../libc/stdint.h"
+#include "../../klibc/stdint.h"
 
 /**
  * tss_entry_t - x86 Task State Segment (hardware layout)

@@ -1,4 +1,4 @@
-#include "../libc/stdarg.h"
+#include "../klibc/stdarg.h"
 #include "../drivers/screen.h"
 
 // Simple test function to demonstrate va_list

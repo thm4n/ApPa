@@ -1,7 +1,7 @@
 #ifndef IRQ_H
 #define IRQ_H
 
-#include "../../libc/stdint.h"
+#include "../../klibc/stdint.h"
 #include "isr.h"
 
 /*

@@ -10,8 +10,8 @@
  *   EAX = return value
  */
 
-#ifndef LIBC_SYSCALL_H
-#define LIBC_SYSCALL_H
+#ifndef KLIBC_SYSCALL_H
+#define KLIBC_SYSCALL_H
 
 #include "stdint.h"
 
@@ -90,4 +90,4 @@ int sys_getpid(void);
 /** Sleep for ms milliseconds. */
 void sys_sleep(int ms);
 
-#endif /* LIBC_SYSCALL_H */
+#endif /* KLIBC_SYSCALL_H */

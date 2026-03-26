@@ -1,7 +1,7 @@
 #ifndef GDT_H
 #define GDT_H
 
-#include "../../libc/stdint.h"
+#include "../../klibc/stdint.h"
 
 // ─── Segment Selectors ────────────────────────────────────────────────────
 // These match the GDT layout: null(0), kcode(1), kdata(2), ucode(3), udata(4), tss(5)

@@ -7,7 +7,7 @@
 
 #include "tss.h"
 #include "gdt.h"
-#include "../../libc/string.h"
+#include "../../klibc/string.h"
 
 // The single kernel TSS instance
 static tss_entry_t tss;

@@ -30,8 +30,8 @@
 #include "../kernel/task/sched.h"
 #include "../kernel/sys/timer.h"
 #include "../kernel/mem/paging.h"
-#include "../libc/string.h"
-#include "../libc/syscall.h"
+#include "../klibc/string.h"
+#include "../klibc/syscall.h"
 
 /*
  * MAP_SHARED_VAR - Map the page containing a kernel-resident variable

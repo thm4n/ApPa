@@ -2,7 +2,7 @@
 #define SIMPLEFS_H
 
 #include "block.h"
-#include "../libc/stdint.h"
+#include "../klibc/stdint.h"
 
 /**
  * SimpleFS - A minimal filesystem for ApPa OS

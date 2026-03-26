@@ -1,7 +1,7 @@
 #ifndef KEYBOARD_H
 #define KEYBOARD_H
 
-#include "../libc/stdint.h"
+#include "../klibc/stdint.h"
 
 /*
  * PS/2 Keyboard Driver

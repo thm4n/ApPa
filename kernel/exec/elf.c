@@ -24,8 +24,8 @@
 #include "../task/task.h"
 #include "../task/sched.h"
 #include "../sys/klog.h"
-#include "../../libc/string.h"
-#include "../../libc/stdio.h"
+#include "../../klibc/string.h"
+#include "../../klibc/stdio.h"
 #include "../../fs/simplefs.h"
 
 /* ─── Internal helpers ──────────────────────────────────────────────────── */

@@ -5,7 +5,7 @@
 #include "test_pmm.h"
 #include "../drivers/screen.h"
 #include "../kernel/mem/pmm.h"
-#include "../libc/string.h"
+#include "../klibc/string.h"
 
 void test_pmm(void) {
     kprint("=== Testing Physical Memory Manager ===\n");

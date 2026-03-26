@@ -7,7 +7,7 @@
 #include "test_fs.h"
 #include "../fs/simplefs.h"
 #include "../drivers/screen.h"
-#include "../libc/string.h"
+#include "../klibc/string.h"
 
 void test_fs(void) {
     kprint("=== Testing SimpleFS ===\n");

@@ -7,7 +7,7 @@
 
 #include "ramdisk.h"
 #include "../kernel/mem/pmm.h"
-#include "../libc/string.h"
+#include "../klibc/string.h"
 #include "../drivers/screen.h"
 
 /* Static instance — one RAM disk at a time */

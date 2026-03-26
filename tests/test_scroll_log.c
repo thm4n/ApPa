@@ -1,5 +1,5 @@
-#include "../libc/stdio.h"
-#include "../libc/stddef.h"
+#include "../klibc/stdio.h"
+#include "../klibc/stddef.h"
 #include "../drivers/screen.h"
 #include "../kernel/sys/klog.h"
 #include "test_scroll_log.h"

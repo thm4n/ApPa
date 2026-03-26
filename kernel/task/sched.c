@@ -15,7 +15,7 @@
 #include "../arch/tss.h"
 #include "../arch/gdt.h"
 #include "../mem/paging.h"
-#include "../../libc/string.h"
+#include "../../klibc/string.h"
 #include "../../drivers/screen.h"
 
 // ─── External: low-level context switch (switch.asm) ───────────────────────

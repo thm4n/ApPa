@@ -1,7 +1,7 @@
 #ifndef IDT_H
 #define IDT_H
 
-#include "../../libc/stdint.h"
+#include "../../klibc/stdint.h"
 
 struct InterruptDescriptor32 {
    uint16_t offset_1;        // offset bits 0..15

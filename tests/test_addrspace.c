@@ -22,8 +22,8 @@
 #include "../kernel/sys/timer.h"
 #include "../kernel/mem/pmm.h"
 #include "../kernel/mem/paging.h"
-#include "../libc/string.h"
-#include "../libc/syscall.h"
+#include "../klibc/string.h"
+#include "../klibc/syscall.h"
 
 /* See test_userspace.c for rationale — shared kernel BSS variables need
  * PAGE_USER in the per-process page directory so Ring 3 can write them. */

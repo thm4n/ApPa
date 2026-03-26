@@ -1,7 +1,7 @@
 #ifndef ATA_H
 #define ATA_H
 
-#include "../libc/stdint.h"
+#include "../klibc/stdint.h"
 
 /**
  * ATA PIO Driver
