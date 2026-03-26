@@ -25,6 +25,15 @@
 #include "../libc/string.h"
 #include "../libc/syscall.h"
 
+/* See test_userspace.c for rationale — shared kernel BSS variables need
+ * PAGE_USER in the per-process page directory so Ring 3 can write them. */
+#define MAP_SHARED_VAR(task, var) do {                                   \
+    uint32_t _pg = (uint32_t)&(var) & PAGE_FRAME_MASK;                  \
+    paging_map_page_in((page_directory_t *)(task)->page_dir,             \
+                       _pg, _pg,                                        \
+                       PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER);       \
+} while (0)
+
 /* ─── Shared flags (set by user tasks, read by test harness) ────────────── */
 
 static volatile uint32_t as_write_done    = 0;
@@ -36,6 +45,11 @@ static volatile uint32_t as_fault_survived = 0;   /* Should stay 0 */
 static volatile uint32_t as_cr3_task_a    = 0;
 static volatile uint32_t as_cr3_task_b    = 0;
 
+/* Greeting lives at file scope (non-const → .data, not .rodata) so the
+ * test harness can obtain its address and MAP_SHARED_VAR it.             */
+static char as_hello_msg[] = "[P15] Hello from isolated process!\n";
+static const uint32_t as_hello_msg_len = 35;
+
 /* ─── User-mode task entry points ───────────────────────────────────────── */
 
 /**
@@ -45,8 +59,7 @@ static volatile uint32_t as_cr3_task_b    = 0;
  * page directory.  String is built on the user stack (PAGE_USER).
  */
 static void user_as_hello(void) {
-    char msg[] = "[P15] Hello from isolated process!\n";
-    sys_write(msg, 35);
+    sys_write(as_hello_msg, as_hello_msg_len);
     as_write_done = 1;
 
     int pid = sys_getpid();
@@ -135,11 +148,19 @@ void test_addrspace(void) {
     as_getpid_val  = 0;
     as_exit_done   = 0;
 
+    sched_disable();
     task_t *th = task_create_user(user_as_hello, "as:hello");
     if (!th) {
+        sched_enable();
         kprint("  [FAIL] task_create_user returned NULL\n");
         return;
     }
+    /* Map shared flags so Ring 3 code can write them */
+    MAP_SHARED_VAR(th, as_write_done);
+    MAP_SHARED_VAR(th, as_getpid_val);
+    MAP_SHARED_VAR(th, as_exit_done);
+    MAP_SHARED_VAR(th, as_hello_msg);
+    sched_enable();
 
     test_wait_ms(500);
     task_reap();

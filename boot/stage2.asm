@@ -96,12 +96,12 @@ KERNEL_SECTORS_STAGE2_PATCH:  ; Makefile will patch this location
 	
 	; Don't read more than remaining
 	cmp al, [sectors_remaining]
-	jle .cap_ok
+	jbe .cap_ok
 	mov al, [sectors_remaining]
 .cap_ok:
 	; Don't read more than 127 at a time (safe limit)
 	cmp al, 127
-	jle .do_read
+	jbe .do_read
 	mov al, 127
 .do_read:
 	; Save count for bookkeeping

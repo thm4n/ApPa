@@ -325,3 +325,73 @@ task_t* task_create_user(task_entry_t entry, const char *name) {
 
     return t;
 }
+
+/**
+ * task_create_user_mapped - Spawn a Ring 3 task with a pre-built page directory
+ *
+ * Used by the ELF loader.  The caller has already:
+ *   - Created a per-process page directory
+ *   - Mapped program segments at their virtual addresses
+ *   - Allocated and mapped a user stack at USER_STACK_VIRT
+ *
+ * This function allocates a kernel stack, builds the iret frame, and
+ * adds the task to the scheduler's ready queue.
+ */
+task_t* task_create_user_mapped(uint32_t entry_vaddr, const char *name,
+                                 void *dir, uint32_t dir_phys) {
+    task_t *t = alloc_tcb();
+    if (!t) return 0;
+
+    /* Assign identity */
+    t->id = ++next_task_id;
+    strncpy(t->name, name, TASK_NAME_MAX - 1);
+    t->name[TASK_NAME_MAX - 1] = '\0';
+    t->is_user = 1;
+
+    /* ── Allocate kernel stack (4 KB, supervisor only) ─────────────── */
+    uint32_t kstack_phys = alloc_page();
+    if (!kstack_phys) {
+        memset(t, 0, sizeof(task_t));
+        return 0;
+    }
+    t->kernel_stack = (uint32_t *)kstack_phys;
+    t->esp0 = kstack_phys + TASK_KERNEL_STACK_SIZE;
+
+    /* ── Store the pre-built page directory ─────────────────────────── */
+    t->page_dir = dir;
+    t->cr3      = dir_phys;
+
+    /* user_stack is managed by the page directory (not tracked here) */
+    t->user_stack     = 0;
+    t->user_stack_top = USER_STACK_TOP;
+
+    /* ── Build iret frame on the kernel stack ──────────────────────── *
+     *
+     * Same layout as task_create_user():
+     *   [high]  SS → ESP → EFLAGS → CS → EIP → enter_usermode
+     *           → ebx → esi → edi → ebp  [low] ← t->esp
+     */
+    uint32_t *sp = (uint32_t *)(t->esp0);
+
+    /* iret frame */
+    *(--sp) = GDT_USER_DATA_SEG;              /* SS   */
+    *(--sp) = t->user_stack_top;              /* ESP  */
+    *(--sp) = 0x202;                          /* EFLAGS: IF=1, bit 1 reserved */
+    *(--sp) = GDT_USER_CODE_SEG;              /* CS   */
+    *(--sp) = entry_vaddr;                    /* EIP  */
+
+    /* task_switch frame */
+    *(--sp) = (uint32_t)enter_usermode;       /* ret → enter_usermode */
+    *(--sp) = 0;                              /* ebx */
+    *(--sp) = 0;                              /* esi */
+    *(--sp) = 0;                              /* edi */
+    *(--sp) = 0;                              /* ebp */
+
+    t->esp   = (uint32_t)sp;
+    t->state = TASK_READY;
+    t->next  = 0;
+
+    sched_add_task(t);
+
+    return t;
+}

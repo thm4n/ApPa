@@ -29,8 +29,26 @@
 #include "../kernel/task/task.h"
 #include "../kernel/task/sched.h"
 #include "../kernel/sys/timer.h"
+#include "../kernel/mem/paging.h"
 #include "../libc/string.h"
 #include "../libc/syscall.h"
+
+/*
+ * MAP_SHARED_VAR - Map the page containing a kernel-resident variable
+ * as user-accessible in a task's per-process page directory.
+ *
+ * With Phase 15 per-process address spaces, kernel BSS/data pages are
+ * supervisor-only.  The test's static volatile flags live in kernel BSS,
+ * so user tasks page-fault when they try to write them.  This macro
+ * marks the specific page(s) as PAGE_USER in the clone so the old
+ * shared-variable test design keeps working.
+ */
+#define MAP_SHARED_VAR(task, var) do {                                   \
+    uint32_t _pg = (uint32_t)&(var) & PAGE_FRAME_MASK;                  \
+    paging_map_page_in((page_directory_t *)(task)->page_dir,             \
+                       _pg, _pg,                                        \
+                       PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER);       \
+} while (0)
 
 /* ─── Shared flags (set by user tasks, read by test harness) ────────────── */
 
@@ -116,11 +134,20 @@ void test_userspace(void) {
     user_getpid_val  = 0;
     user_exit_done   = 0;
 
+    /* Disable scheduling so the new task can't run before we
+     * finish mapping the shared variable pages in its address space. */
+    sched_disable();
     task_t *t1 = task_create_user(user_task_hello, "u:hello");
     if (!t1) {
+        sched_enable();
         kprint("  [FAIL] task_create_user returned NULL\n");
         return;
     }
+    /* Map shared flags so Ring 3 code can write them */
+    MAP_SHARED_VAR(t1, user_write_done);
+    MAP_SHARED_VAR(t1, user_getpid_val);
+    MAP_SHARED_VAR(t1, user_exit_done);
+    sched_enable();
     kprint("  [OK] task_create_user returned TCB id=");
     kprint_uint(t1->id);
     kprint("\n");
@@ -153,11 +180,15 @@ void test_userspace(void) {
     kprint("  [2] Creating user task 'yield'...\n");
     user_yield_count = 0;
 
+    sched_disable();
     task_t *t2 = task_create_user(user_task_yield, "u:yield");
     if (!t2) {
+        sched_enable();
         kprint("  [FAIL] task_create_user returned NULL\n");
         return;
     }
+    MAP_SHARED_VAR(t2, user_yield_count);
+    sched_enable();
 
     test_wait_ms(500);
     task_reap();

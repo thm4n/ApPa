@@ -2,6 +2,7 @@
 #include "../drivers/screen.h"
 #include "../drivers/ata.h"
 #include "../libc/string.h"
+#include "../libc/stdio.h"
 #include "../fs/simplefs.h"
 #include "../kernel/mem/kmalloc.h"
 #include "../kernel/mem/pmm.h"
@@ -11,6 +12,8 @@
 #include "../tests/test_multitask.h"
 #include "../tests/test_userspace.h"
 #include "../tests/test_addrspace.h"
+#include "../tests/test_elf.h"
+#include "../kernel/exec/elf.h"
 
 /*
  * ApPa Simple Command Shell
@@ -40,6 +43,8 @@ static void cmd_disk(void);
 static void cmd_tasktest(void);
 static void cmd_usertest(void);
 static void cmd_addrtest(void);
+static void cmd_exec(const char* args);
+static void cmd_elftest(void);
 static void cmd_dmesg(const char* args);
 
 /**
@@ -147,6 +152,10 @@ void shell_execute(const char* cmd) {
 		cmd_usertest();
 	} else if (strncmp(cmd, "addrtest", cmd_len) == 0 && cmd_len == 8) {
 		cmd_addrtest();
+	} else if (strncmp(cmd, "exec", cmd_len) == 0 && cmd_len == 4) {
+		cmd_exec(args);
+	} else if (strncmp(cmd, "elftest", cmd_len) == 0 && cmd_len == 7) {
+		cmd_elftest();
 	} else if (strncmp(cmd, "dmesg", cmd_len) == 0 && cmd_len == 5) {
 		cmd_dmesg(args);
 	} else {
@@ -177,6 +186,8 @@ static void cmd_help(void) {
 	kprint("  tasktest     - Run multitasking tests\n");
 	kprint("  usertest     - Run Ring 3 userspace tests\n");
 	kprint("  addrtest     - Run per-process address space tests\n");
+	kprint("  exec <file>  - Load & run ELF binary from filesystem\n");
+	kprint("  elftest      - Run ELF loader tests\n");
 	kprint("  dmesg        - Display kernel log buffer\n");
 	kprint("  dmesg save   - Flush kernel log to klog.txt\n");
 	kprint("  color <name> - Change text color\n");
@@ -525,6 +536,34 @@ static void cmd_usertest(void) {
  */
 static void cmd_addrtest(void) {
 	test_addrspace();
+}
+
+/**
+ * cmd_exec - Load and execute an ELF binary from the filesystem
+ * @args: Filename of the ELF binary
+ */
+static void cmd_exec(const char* args) {
+	if (!*args) {
+		kprint("Usage: exec <filename>\n");
+		return;
+	}
+
+	kprintf("[ELF] Loading '%s'...\n", args);
+
+	task_t *t = elf_exec(args, args);
+	if (!t) {
+		kprintf("[ELF] Failed to load '%s'\n", args);
+		return;
+	}
+
+	kprintf("[ELF] Spawned task '%s' (tid=%d)\n", args, t->id);
+}
+
+/**
+ * cmd_elftest - Run ELF loader unit tests
+ */
+static void cmd_elftest(void) {
+	test_elf();
 }
 
 /**

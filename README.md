@@ -68,6 +68,11 @@ Initializing system...
 | `disk` | Show ATA disk information |
 | `tasktest` | Run multitasking tests (Phase 12) |
 | `usertest` | Run Ring 3 userspace tests (Phase 13) |
+| `addrtest` | Run per-process address space tests (Phase 15) |
+| `exec <file>` | Load & run ELF binary from filesystem (Phase 16) |
+| `elftest` | Run ELF loader tests (Phase 16) |
+| `dmesg` | Display kernel log buffer |
+| `dmesg save` | Flush kernel log to klog.txt |
 | `color <name>` | Change text color (16 VGA colors) |
 
 ---
@@ -113,6 +118,8 @@ ApPa/
 │   │   ├── sched.c/h       #   Round-robin preemptive scheduler
 │   │   ├── switch.asm      #   Low-level context switch (callee-saved regs)
 │   │   └── umode.asm       #   User-mode entry trampoline (iret to Ring 3)
+│   ├── exec/               # Program loader (Phase 16)
+│   │   └── elf.c/h         #   ELF32 parser and loader
 │   └── sys/                # Core kernel services
 │       ├── kernel_main.c   #   Kernel entry point and initialization sequence
 │       ├── timer.c/h       #   System timer (IRQ0, uptime tracking)
@@ -152,7 +159,13 @@ ApPa/
 │   ├── test_ata.c/h        #   ATA PIO driver tests (5 tests)
 │   ├── test_fs.c/h         #   SimpleFS filesystem tests (10 tests)
 │   ├── test_multitask.c/h  #   Multitasking tests (6 tests, run via `tasktest` command)
-│   └── test_userspace.c/h  #   Ring 3 userspace tests (run via `usertest` command)
+│   ├── test_userspace.c/h  #   Ring 3 userspace tests (run via `usertest` command)
+│   ├── test_addrspace.c/h  #   Per-process address space tests (run via `addrtest` command)
+│   └── test_elf.c/h        #   ELF loader tests (run via `elftest` command)
+│
+├── user/                   # User-space programs (built separately)
+│   ├── hello.c             #   Minimal test ELF program (prints via syscalls)
+│   └── link.ld             #   Linker script for user programs (base 0x08048000)
 │
 ├── Information/            # Design documents and implementation guides
 ├── makefile                # Build system (cross-compiler, auto-patch sector count)
@@ -178,16 +191,19 @@ ApPa/
 | 11 | File System & Disk I/O | `drivers/ata.c`, `fs/simplefs.c`, `fs/ramdisk.c` | ✅ Done |
 | 12 | Multitasking | `kernel/task/sched.c`, `task.c`, `switch.asm`, `kernel/arch/tss.c` | ✅ Done |
 | 13 | Userspace (Ring 3) | `kernel/arch/syscall.c`, `syscall_stub.asm`, `kernel/task/umode.asm`, `libc/syscall.c` | ✅ Done |
-| 14 | Persistent FS (ATA-backed) | `fs/simplefs.c`, `drivers/ata_blockdev.c` | ⬜ Next |
-| 15 | Per-Process Address Spaces | — | ⬜ Planned |
+| 14 | Persistent FS (ATA-backed) | `fs/simplefs.c`, `drivers/ata_blockdev.c` | ✅ Done |
+| 15 | Per-Process Address Spaces | `kernel/mem/paging.c`, `kernel/task/task.c` | ✅ Done |
+| 16 | ELF Loader | `kernel/exec/elf.c`, `user/hello.c` | ✅ Done |
 
-### Future Directions
+### Future Phases
 
-- **Per-Process Address Spaces** — Private page directories, CR3 switching (Phase 15, planned)
-- **ELF Loader** — Load and execute programs from disk
-- **Blocking I/O / IPC** — Sleep queues, pipes, message passing
-- **Networking** — NE2000 driver, basic TCP/IP stack
-- **Graphics** — VESA VBE framebuffer mode
+| # | Phase | Description | Key Changes | Status |
+|---|-------|-------------|-------------|--------|
+| 17 | **argv/argc** | Pass command-line arguments to user programs | Parse args from `exec <file> <args...>`, push `argv[]` strings + pointer array + `argc` onto user stack before `iret`, update `_start` signature in user programs | 🔲 Planned |
+| 18 | **SYS_EXEC** | Syscall to replace current process image | Implement `execve`-style syscall: validate ELF from filesystem, tear down current address space, load new segments, reset stack with argv, jump to new entry point | 🔲 Planned |
+| 19 | **Blocking I/O / IPC** | Sleep queues, pipes, message passing | Add `TASK_BLOCKED` wait queues, `SYS_SLEEP` with PIT-driven wakeup, pipe buffers for inter-process communication, `SYS_PIPE`/`SYS_READ`/`SYS_WRITE` on pipe fds | 🔲 Planned |
+| 20 | **Networking** | NE2000 NIC driver + basic TCP/IP | PCI bus enumeration, NE2000 (RTL8029) driver with IRQ-driven RX/TX, ARP, IPv4, ICMP (ping), UDP sockets, simple `netstat`/`ping` shell commands | 🔲 Planned |
+| 21 | **Graphics** | VESA VBE framebuffer mode | Switch to linear framebuffer via VBE at boot (real-mode INT 10h before protected mode), pixel plotting, bitmap font renderer, simple windowing primitives | 🔲 Planned |
 
 ---
 
@@ -253,4 +269,4 @@ The kernel sector count is **auto-patched** into `stage2.bin` at offset `STAGE2_
 
 Tests run automatically during kernel boot (after all subsystems initialize, before the shell prompt). See [tests/README.md](tests/README.md) for the test framework guide.
 
-**Current results:** 47 `[PASS]` assertions across 7 checkpoints at boot, plus `tasktest` (6 multitasking tests) and `usertest` (3 Ring 3 syscall/GPF tests) available as shell commands.
+**Current results:** 47 `[PASS]` assertions across 7 checkpoints at boot, plus `tasktest` (6 multitasking tests), `usertest` (3 Ring 3 syscall/GPF tests), `addrtest` (4 address space isolation tests), and `elftest` (ELF loader tests) available as shell commands.

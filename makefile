@@ -6,8 +6,8 @@
 MAKEFLAGS += --no-builtin-rules
 .SUFFIXES:
 
-C_SOURCES = $(wildcard *.c */*.c */*/*.c)
-HEADERS = $(wildcard *.h */*.h */*/*.h)
+C_SOURCES = $(filter-out user/%.c, $(wildcard *.c */*.c */*/*.c))
+HEADERS = $(filter-out user/%.h, $(wildcard *.h */*.h */*/*.h))
 OBJ = ${C_SOURCES:.c=.o}
 
 # Kernel assembly sources (not boot sector)
@@ -98,7 +98,7 @@ help:
 	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make build"       "Compile kernel + assemble disk image"
 	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make run"         "Build & launch QEMU (graphical window)"
 	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make run-term"    "Build & launch QEMU (curses terminal)"
-	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make run-log"     "Build & launch QEMU (serial → stdout)"
+	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make run-log"     "Build & launch QEMU (curses + serial log)"
 	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make debug"       "Build & launch QEMU + GDB session"
 	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make clean"       "Remove build artifacts (keeps disk.img)"
 	@printf "  $(CLR_CYN)%-20s$(CLR_RST) %s\n" "make disk-reset"  "Delete persistent disk image"
@@ -157,6 +157,38 @@ check:
 	@printf "  $(CLR_CYN)%-8s$(CLR_RST) %s\n" "[INFO]" "C sources:"
 	@echo ${C_SOURCES} | tr ' ' '\n' | sed 's/^/           /'
 
+# ========== User-Space ELF Programs ==========
+# Built separately with their own linker script, then converted to
+# embeddable C headers via xxd so they can be written to SimpleFS
+# at runtime or embedded in tests.
+
+USER_DIR     = user
+USER_SOURCES = $(wildcard $(USER_DIR)/*.c)
+USER_ELFS    = $(USER_SOURCES:.c=.elf)
+USER_HEADERS = $(USER_SOURCES:.c=_elf.h)
+
+# Compile user .c → .o (freestanding, no stdlib)
+$(USER_DIR)/%.o: $(USER_DIR)/%.c
+	$(call log,USR_CC,$<)
+	$(Q)$(CC) -g -ffreestanding -nostdlib -march=i686 -c $< -o $@
+
+# Link user .o → .elf using the user linker script
+$(USER_DIR)/%.elf: $(USER_DIR)/%.o $(USER_DIR)/link.ld
+	$(call log,USR_LD,$@)
+	$(Q)$(LD) -T $(USER_DIR)/link.ld $< -o $@
+
+# Convert .elf → _elf.h (C byte array) via xxd
+$(USER_DIR)/%_elf.h: $(USER_DIR)/%.elf
+	$(call log,XXD,$< -> $@)
+	$(Q)xxd -i $< > $@
+
+# Convenience target to build all user programs
+user-programs: $(USER_ELFS) $(USER_HEADERS)
+	$(call log,USR,$(words $(USER_ELFS)) user program(s) built)
+
+# Kernel objects depend on generated user ELF headers
+$(OBJ): $(USER_HEADERS)
+
 # Stage2 patch offset (location of sectors_remaining immediate value in stage2.asm)
 # Use: nasm boot/stage2.asm -o /tmp/s2.bin -l /tmp/s2.lst && grep -A1 KERNEL_SECTORS_STAGE2_PATCH /tmp/s2.lst
 STAGE2_PATCH_OFFSET = 0x3F
@@ -198,12 +230,14 @@ run-term: $(BIN_DIR)/image.bin $(DISK_IMG)
 	@printf "  $(CLR_DIM)%-8s ESC+2 for monitor | Ctrl+A X to exit$(CLR_RST)\n" ""
 	@qemu-system-i386 -s -drive file=$<,format=raw $(QEMU_DISK) -display curses
 
-# Run QEMU with serial output tee'd to stdout (no keyboard input)
+# Run QEMU with curses display + serial logged to file (keyboard works)
 run-log: $(BIN_DIR)/image.bin $(DISK_IMG)
-	$(call log,QEMU,serial logging mode (with persistent disk))
-	@printf "  $(CLR_DIM)%-8s Output: stdout + last_run.log | Ctrl+A X to exit$(CLR_RST)\n" ""
+	$(call log,QEMU,curses + serial log mode (with persistent disk))
+	@printf "  $(CLR_DIM)%-8s VGA in terminal | serial → last_run.log$(CLR_RST)\n" ""
+	@printf "  $(CLR_DIM)%-8s ESC+2 for monitor | ESC+3 for serial | Ctrl+A X to exit$(CLR_RST)\n" ""
 	@rm -f last_run.log
-	@qemu-system-i386 -s -drive file=$<,format=raw $(QEMU_DISK) -serial mon:stdio -nographic 2>&1 | tee last_run.log
+	@qemu-system-i386 -s -drive file=$<,format=raw $(QEMU_DISK) \
+		-display curses -serial file:last_run.log
 
 # Aliases for convenience
 run: run-graphics
@@ -233,6 +267,8 @@ clean:
 	@find $(BIN_DIR) -maxdepth 1 -type f ! -name 'disk.img' -exec rm -f {} + 2>/dev/null || true
 	$(call log,CLEAN,*.o)
 	@rm -f $(wildcard *.o */*.o */*/*.o)
+	$(call log,CLEAN,user/*.elf user/*_elf.h)
+	@rm -f $(wildcard user/*.o user/*.elf user/*_elf.h)
 	@printf "  $(CLR_GRN)%-8s$(CLR_RST) All build artifacts removed\n\n" "[DONE]"
 
 # ========== Memory Layout Inspector ==========
@@ -299,4 +335,4 @@ IMG ?= $(DISK_IMG)
 mem_img_show:
 	@python3 tools/simplefs_inspect.py $(IMG)
 
-.PHONY: all help build run run-graphics run-term run-log debug clean check disk-reset mem_show mem_img_show _build_banner _build_done
+.PHONY: all help build run run-graphics run-term run-log debug clean check disk-reset mem_show mem_img_show _build_banner _build_done user-programs

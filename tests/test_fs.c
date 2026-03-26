@@ -12,6 +12,15 @@
 void test_fs(void) {
     kprint("=== Testing SimpleFS ===\n");
 
+    /* ── Cleanup stale entries from previous runs on persistent disk ── */
+    fs_delete("test.txt");
+    fs_delete("mydir");
+    fs_delete("notes.txt");
+
+    /* Snapshot how many entries already exist so tests can be relative */
+    fs_entry_t pre_entries[32];
+    uint32_t pre_count = fs_list(pre_entries, 32);
+
     /* Test 1: Create a file */
     kprint("\nTest 1: Create file...\n");
     if (fs_create("test.txt", FS_TYPE_FILE) == 0) {
@@ -85,13 +94,14 @@ void test_fs(void) {
     kprint("\nTest 7: List directory...\n");
     fs_entry_t entries[32];
     uint32_t count = fs_list(entries, 32);
-    if (count == 2) {
+    uint32_t new_count = count - pre_count;
+    if (new_count == 2) {
         kprint("  [PASS] Listed ");
-        kprint_uint(count);
-        kprint(" entries (test.txt + mydir)\n");
+        kprint_uint(new_count);
+        kprint(" new entries (test.txt + mydir)\n");
     } else {
-        kprint("  [FAIL] Expected 2 entries, got ");
-        kprint_uint(count);
+        kprint("  [FAIL] Expected 2 new entries, got ");
+        kprint_uint(new_count);
         kprint("\n");
     }
 
@@ -140,11 +150,13 @@ void test_fs(void) {
     fs_delete("notes.txt");
     fs_delete("mydir");
 
-    /* Verify clean state */
+    /* Verify clean state — should be back to pre-test count */
     count = fs_list(entries, 32);
     kprint("\nCleanup: ");
     kprint_uint(count);
-    kprint(" entries remaining (expected 0)\n");
+    kprint(" entries remaining (");
+    kprint_uint(pre_count);
+    kprint(" pre-existing)\n");
 
     kprint("\nSimpleFS tests: 10 run\n");
     kprint("[ALL FS TESTS PASSED]\n");

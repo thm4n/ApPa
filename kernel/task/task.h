@@ -106,4 +106,21 @@ void task_reap(void);
  */
 task_t* task_create_user(task_entry_t entry, const char *name);
 
+/**
+ * task_create_user_mapped - Spawn a Ring 3 task with a pre-built page directory
+ * @entry_vaddr: Virtual entry point (EIP for Ring 3)
+ * @name:        Human-readable name
+ * @dir:         Pre-built page directory (caller already mapped code + stack)
+ * @dir_phys:    Physical address of the page directory
+ *
+ * Used by the ELF loader: the caller has already created a page directory,
+ * mapped program segments and the user stack at USER_STACK_VIRT.  This
+ * function allocates a kernel stack, builds an iret frame, and adds
+ * the task to the scheduler.
+ *
+ * Returns: Pointer to the new task, or NULL on failure.
+ */
+task_t* task_create_user_mapped(uint32_t entry_vaddr, const char *name,
+                                 void *dir, uint32_t dir_phys);
+
 #endif // TASK_H
